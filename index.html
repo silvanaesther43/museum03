@@ -302,7 +302,7 @@ table.simple tr:hover td{color:var(--text)}
     <div id="map"></div>
     <div id="loadingOverlay">
       <div class="spinner"></div>
-      <span id="loadingText">Consultando Overpass API…</span>
+      <span id="loadingText">Cargando museos…</span>
     </div>
   </div>
 </div>
@@ -355,52 +355,14 @@ table.simple tr:hover td{color:var(--text)}
    CONFIGURACIÓN
    ============================================================ */
 const CFG = {
-  overpassUrl:    'https://overpass-api.de/api/interpreter',
-  overpassMirror: 'https://overpass.kumi.systems/api/interpreter',
+  // Lo regenera cada 6 h GitHub Actions (scripts/actualizar_museos.mjs) consultando
+  // Overpass; la página solo lee este archivo y lo vuelve a pedir cada refreshInterval.
+  dataUrl: 'data/museos.geojson',
   refreshInterval: 5 * 60 * 1000,
-  deptMaxKm: 25, // más lejos que esto de todo departamento → no es Bolivia, se descarta
 };
 
 // Límites departamentales reales (departamentos.js, GeoBolivia vía geoBoundaries).
-// Cada museo se asigna al departamento cuyo polígono lo contiene.
-const DEPT_POLYS = BOLIVIA_DEPARTAMENTOS.features.map(f=>({
-  nombre: f.properties.nombre,
-  polys: f.geometry.type==='Polygon' ? [f.geometry.coordinates] : f.geometry.coordinates,
-}));
-const DEPT_ORDER = DEPT_POLYS.map(d=>d.nombre);
-
-function inRing(lon, lat, ring){
-  let dentro = false;
-  for (let i=0, j=ring.length-1; i<ring.length; j=i++){
-    const [xi,yi] = ring[i], [xj,yj] = ring[j];
-    if ((yi>lat)!==(yj>lat) && lon < (xj-xi)*(lat-yi)/(yj-yi)+xi) dentro = !dentro;
-  }
-  return dentro;
-}
-function ringDistKm(lat, lon, ring){
-  const kx = 111.32*Math.cos(lat*Math.PI/180), ky = 110.57;
-  let min = Infinity;
-  for (let i=1; i<ring.length; i++){
-    const ax=(ring[i-1][0]-lon)*kx, ay=(ring[i-1][1]-lat)*ky;
-    const bx=(ring[i][0]-lon)*kx,   by=(ring[i][1]-lat)*ky;
-    const dx=bx-ax, dy=by-ay;
-    const t = Math.max(0, Math.min(1, -(ax*dx+ay*dy)/(dx*dx+dy*dy||1)));
-    min = Math.min(min, Math.hypot(ax+t*dx, ay+t*dy));
-  }
-  return min;
-}
-function assignDept(lat, lon){
-  for (const d of DEPT_POLYS)
-    if (d.polys.some(p=>inRing(lon, lat, p[0]))) return d.nombre;
-  // Islas y orillas del Titicaca quedan fuera del borde simplificado:
-  // se asignan al departamento más cercano.
-  let best = null, bestKm = CFG.deptMaxKm;
-  for (const d of DEPT_POLYS) for (const p of d.polys){
-    const km = ringDistKm(lat, lon, p[0]);
-    if (km < bestKm){ bestKm = km; best = d.nombre; }
-  }
-  return best;
-}
+const DEPT_ORDER = BOLIVIA_DEPARTAMENTOS.features.map(f=>f.properties.nombre);
 
 // ── Categorías de museo (tag OSM museum=*) ──
 const CAT_LABELS = {
@@ -593,43 +555,23 @@ const userIcon = L.divIcon({
 });
 
 /* ============================================================
-   CONSULTA OVERPASS
+   DATOS — data/museos.geojson (museos de OSM con su departamento)
    ============================================================ */
-// Solo museos dentro del límite nacional de Bolivia en OSM. El rectángulo que
-// se usaba antes traía también ~100 museos de Perú, Chile, Brasil, Argentina y Paraguay.
-function buildQuery(){
-  return `[out:json][timeout:90];area["ISO3166-1"="BO"][admin_level=2]->.bo;nwr["tourism"="museum"](area.bo);out center qt;`;
+async function fetchMuseos(){
+  // no-cache: revalida con el servidor (304 si no cambió) para ver las actualizaciones.
+  const r = await fetch(CFG.dataUrl, {cache:'no-cache'});
+  if (!r.ok) throw new Error('HTTP '+r.status);
+  return r.json();
 }
 
-async function fetchOverpass(){
-  const body = new URLSearchParams({data:buildQuery()}).toString();
-  let lastErr;
-  for (const url of [CFG.overpassUrl, CFG.overpassMirror]){
-    try{
-      const r = await fetch(url,{method:'POST',
-        headers:{'Content-Type':'application/x-www-form-urlencoded','Accept':'application/json'}, body});
-      if (!r.ok) throw new Error('HTTP '+r.status);
-      const j = await r.json();
-      // Un servidor sin índice de áreas responde vacío en vez de fallar.
-      if (!j.elements?.length) throw new Error('respuesta vacía');
-      return j;
-    }catch(e){ lastErr=e; console.warn(url, e.message); }
-  }
-  throw lastErr || new Error('Overpass no disponible');
-}
-
-function elementToMuseum(el){
-  const lat = el.lat ?? el.center?.lat;
-  const lon = el.lon ?? el.center?.lon;
-  if (lat==null || lon==null) return null;
-  const t = el.tags || {};
-  const dept = assignDept(lat,lon);
-  if (!dept) return null;
+function featureToMuseum(f){
+  const [lon, lat] = f.geometry.coordinates;
+  const t = f.properties;
   return {
-    i: (el.type==='node'?'node':el.type==='way'?'way':'relation')+'/'+el.id,
-    rawId: el.id, osmType: el.type,
+    i: t.osm_type+'/'+t.osm_id,
+    rawId: t.osm_id, osmType: t.osm_type,
     a: lat, o: lon,
-    d: dept,
+    d: t.departamento,
     n: t.name || t['name:es'] || '(sin nombre)',
     cat: museumCategory(t),
     street: [t['addr:street'], t['addr:housenumber']].filter(Boolean).join(' '),
@@ -1072,13 +1014,14 @@ function updateDashboard(){
    CARGA + AUTO-ACTUALIZACIÓN
    ============================================================ */
 async function loadMuseums(initial){
-  setStatus('loading', initial ? 'Consultando Overpass API (museos de Bolivia)…' : 'Verificando nuevos museos en OSM…');
+  setStatus('loading', initial ? 'Cargando museos de Bolivia…' : 'Buscando datos nuevos…');
   try{
-    const data = await fetchOverpass();
+    const data = await fetchMuseos();
+    const fecha = new Date(data.actualizado).toLocaleString('es-BO',
+      {timeZone:'America/La_Paz', dateStyle:'short', timeStyle:'short'});
     const nuevos = [];
-    for (const el of (data.elements||[])){
-      const m = elementToMuseum(el);
-      if (!m) continue;
+    for (const f of data.features){
+      const m = featureToMuseum(f);
       if (loadedIds.has(m.i)) continue;
       loadedIds.add(m.i);
       MUSEUMS.push(m);
@@ -1089,7 +1032,7 @@ async function loadMuseums(initial){
     if (initial){
       renderAll();
       document.getElementById('loadingOverlay').classList.add('hidden');
-      setStatus('ok', '✓ '+MUSEUMS.length.toLocaleString()+' museos cargados desde OpenStreetMap');
+      setStatus('ok', '✓ '+MUSEUMS.length.toLocaleString()+' museos de OpenStreetMap · datos del '+fecha);
       showToast('✓ '+MUSEUMS.length.toLocaleString()+' museos cargados','success');
     } else if (nuevos.length>0){
       addNewMarkers(nuevos);
@@ -1100,12 +1043,12 @@ async function loadMuseums(initial){
       updateDashboard();
       if (userLatLng) renderNearby();
     } else {
-      setStatus('ok', '✓ Sin cambios — '+MUSEUMS.length.toLocaleString()+' museos');
+      setStatus('ok', '✓ Sin cambios — '+MUSEUMS.length.toLocaleString()+' museos · datos del '+fecha);
     }
   }catch(e){
-    setStatus('error', 'Error consultando Overpass: '+e.message);
+    setStatus('error', 'Error cargando los museos: '+e.message);
     if (initial) document.getElementById('loadingOverlay').classList.add('hidden');
-    showToast('No se pudo conectar con Overpass API','error');
+    showToast('No se pudieron cargar los museos','error');
   }
   scheduleNext();
 }
