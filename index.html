@@ -1,0 +1,1048 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Museos de Bolivia — Geoportal Cultural</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css"/>
+<style>
+:root{
+  --bg:#161009; --bg2:#1e1610; --bg3:#281e15; --panel:#211810;
+  --line:#41321f; --line-soft:#332616;
+  --text:#efe6d6; --text-dim:#b3a48c; --text-faint:#83745d;
+  --gold:#cf9a44; --gold-bright:#e8b862;
+  --teal:#2f7a72; --teal-bright:#48a89c;
+  --terracotta:#bd5a3d; --terracotta-bright:#d97b57;
+  --ok:#6ea87a; --warn:#cf9a44; --error:#c0503c;
+  --radius-sm:4px; --radius-md:8px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  font-family:'IBM Plex Sans',system-ui,sans-serif;
+  background:var(--bg); color:var(--text);
+  height:100vh; display:flex; flex-direction:column; overflow:hidden;
+}
+h1,h2,h3,.serif{font-family:'Fraunces',Georgia,serif}
+::selection{background:var(--gold);color:#1a1208}
+
+/* ---------- header ---------- */
+header{
+  background:linear-gradient(180deg,var(--bg2),var(--bg));
+  border-bottom:1px solid var(--line);
+  padding:10px 18px; display:flex; align-items:center; gap:16px; flex-wrap:wrap;
+  flex-shrink:0; z-index:1200; position:relative;
+}
+.brand{display:flex; align-items:baseline; gap:10px; white-space:nowrap}
+.brand h1{font-size:1.15rem; font-weight:600; color:var(--text); letter-spacing:.2px}
+.brand h1 em{font-style:normal; color:var(--gold-bright)}
+.brand small{font-size:.66rem; color:var(--text-faint); border:1px solid var(--line); border-radius:999px; padding:2px 9px}
+.tabs{display:flex; gap:2px; background:var(--bg3); border:1px solid var(--line); border-radius:7px; padding:2px}
+.tab-btn{
+  background:transparent; border:none; color:var(--text-dim); font:600 .8rem 'IBM Plex Sans';
+  padding:6px 14px; border-radius:5px; cursor:pointer; transition:all .15s;
+}
+.tab-btn.active{background:var(--gold); color:#1a1208}
+.tab-btn:not(.active):hover{color:var(--text)}
+.hdr-controls{display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-left:auto}
+.hdr-controls label{font-size:.72rem; color:var(--text-faint)}
+select{
+  background:var(--bg3); color:var(--text); border:1px solid var(--line); border-radius:6px;
+  padding:6px 10px; font-size:.8rem; cursor:pointer; font-family:'IBM Plex Sans';
+}
+select:focus{outline:1px solid var(--gold-bright)}
+.btn{
+  background:var(--gold); color:#1a1208; border:none; border-radius:6px; padding:7px 14px;
+  font-size:.8rem; font-weight:600; cursor:pointer; white-space:nowrap; transition:background .15s;
+  font-family:'IBM Plex Sans';
+}
+.btn:hover{background:var(--gold-bright)}
+.btn-outline{background:transparent; border:1px solid var(--line); color:var(--text-dim)}
+.btn-outline:hover{border-color:var(--teal-bright); color:var(--text)}
+.btn-teal{background:var(--teal); color:#eafaf7}
+.btn-teal:hover{background:var(--teal-bright)}
+.btn:disabled{opacity:.4; cursor:not-allowed}
+.btn-sm{padding:4px 10px; font-size:.72rem; border-radius:5px}
+
+/* ---------- status bar ---------- */
+#statusBar{
+  display:flex; align-items:center; gap:12px; padding:5px 18px; background:var(--bg);
+  border-bottom:1px solid var(--line-soft); font-size:.72rem; color:var(--text-faint); flex-shrink:0;
+}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--text-faint);flex-shrink:0;transition:background .3s}
+.dot.loading{background:var(--gold);animation:pulse 1s infinite}
+.dot.ok{background:var(--ok)}
+.dot.error{background:var(--error)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+#countBadge{margin-left:auto; background:var(--bg3); border:1px solid var(--line); border-radius:999px; padding:2px 11px; font-size:.7rem; color:var(--text-dim)}
+#nextUpdate{color:var(--text-faint)}
+
+/* ---------- main views ---------- */
+.view{flex:1; position:relative; min-height:0; display:none}
+.view.active{display:flex}
+#map{flex:1; width:100%}
+.leaflet-container{background:#100c08}
+
+/* ---------- sidebar ---------- */
+#sidebar{
+  width:270px; flex-shrink:0; background:var(--panel); border-right:1px solid var(--line);
+  overflow-y:auto; padding:14px 14px 24px; z-index:800; display:flex; flex-direction:column; gap:18px;
+}
+#sidebar::-webkit-scrollbar{width:6px}
+#sidebar::-webkit-scrollbar-thumb{background:var(--line); border-radius:3px}
+.side-block h3{font-size:.68rem; text-transform:uppercase; letter-spacing:.08em; color:var(--gold-bright); margin-bottom:9px; font-family:'IBM Plex Sans'; font-weight:600}
+.search-input, .text-input{
+  width:100%; background:var(--bg); border:1px solid var(--line); color:var(--text);
+  border-radius:6px; padding:8px 10px; font-size:.8rem; font-family:'IBM Plex Sans';
+}
+.search-input:focus, .text-input:focus{outline:1px solid var(--gold-bright)}
+.cat-list{display:flex; flex-direction:column; gap:1px; max-height:340px; overflow-y:auto; margin-top:2px}
+.cat-list::-webkit-scrollbar{width:5px}
+.cat-list::-webkit-scrollbar-thumb{background:var(--line); border-radius:3px}
+.cat-row{
+  display:flex; align-items:center; gap:8px; padding:5px 4px; border-radius:5px; cursor:pointer; font-size:.76rem;
+}
+.cat-row:hover{background:var(--bg3)}
+.cat-row input{accent-color:var(--gold); width:14px; height:14px; flex-shrink:0}
+.cat-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+.cat-row .cat-name{flex:1; color:var(--text-dim)}
+.cat-row .cat-count{color:var(--text-faint); font-family:'IBM Plex Mono'; font-size:.68rem}
+.cat-actions{display:flex; gap:10px; margin-top:6px}
+.link-btn{background:none;border:none;color:var(--teal-bright);font-size:.68rem;cursor:pointer;font-family:'IBM Plex Sans'}
+.link-btn:hover{text-decoration:underline}
+
+.loc-panel p{font-size:.72rem; color:var(--text-faint); line-height:1.5; margin-bottom:8px}
+#userLocStatus{font-size:.72rem; margin-top:6px; color:var(--teal-bright)}
+.route-result{
+  margin-top:10px; background:var(--bg); border:1px solid var(--line-soft); border-radius:6px; padding:9px 10px;
+  font-size:.74rem; display:none;
+}
+.route-result.show{display:block}
+.route-result .rr-title{color:var(--gold-bright); font-weight:600; margin-bottom:4px}
+.nearby-list{display:flex; flex-direction:column; gap:6px; margin-top:8px}
+.nearby-item{
+  background:var(--bg); border:1px solid var(--line-soft); border-radius:6px; padding:7px 9px;
+  cursor:pointer; transition:border-color .15s;
+}
+.nearby-item:hover{border-color:var(--gold)}
+.nearby-item .ni-name{font-size:.76rem; color:var(--text); font-weight:500}
+.nearby-item .ni-meta{display:flex; justify-content:space-between; margin-top:3px; font-size:.66rem; color:var(--text-faint)}
+.nearby-item .ni-km{color:var(--teal-bright); font-family:'IBM Plex Mono'}
+
+/* ---------- popups ---------- */
+.leaflet-popup-content-wrapper{background:var(--panel)!important; color:var(--text)!important; border:1px solid var(--line)!important; border-radius:9px!important; box-shadow:0 12px 30px rgba(0,0,0,.55)!important}
+.leaflet-popup-tip{background:var(--panel)!important; border:1px solid var(--line)!important}
+.leaflet-popup-content{margin:0!important; width:290px!important}
+.leaflet-popup-close-button{color:var(--text-faint)!important}
+.pop-img{width:100%; height:130px; object-fit:cover; border-radius:9px 9px 0 0; display:block; background:var(--bg3)}
+.pop-body{padding:12px 14px 14px}
+.pop-cat{display:inline-block; font-size:.62rem; text-transform:uppercase; letter-spacing:.05em; font-weight:600; padding:2px 8px; border-radius:999px; margin-bottom:7px}
+.pop-title{font-family:'Fraunces'; font-size:1rem; font-weight:600; color:var(--text); line-height:1.25; margin-bottom:2px}
+.pop-sub{font-size:.72rem; color:var(--text-faint); margin-bottom:8px}
+.pop-row{display:flex; gap:8px; font-size:.74rem; padding:3px 0; border-bottom:1px solid var(--line-soft)}
+.pop-row:last-of-type{border-bottom:none}
+.pop-key{color:var(--text-faint); flex-shrink:0; min-width:74px}
+.pop-val{color:var(--text-dim); text-align:right; flex:1; word-break:break-word}
+.pop-wiki{margin-top:9px; padding-top:9px; border-top:1px dashed var(--line-soft)}
+.pop-wiki-label{font-size:.62rem; text-transform:uppercase; letter-spacing:.05em; color:var(--teal-bright); font-weight:600; display:flex; align-items:center; gap:5px; margin-bottom:5px}
+.live-dot{width:6px;height:6px;border-radius:50%;background:var(--ok);display:inline-block;animation:pulse 1.4s infinite}
+.pop-extract{font-size:.72rem; color:var(--text-dim); line-height:1.45; margin-bottom:8px}
+.pop-btns{display:flex; flex-wrap:wrap; gap:6px; margin-top:8px}
+.pop-btn{
+  font-size:.68rem; padding:5px 9px; border-radius:5px; text-decoration:none; font-weight:600;
+  border:1px solid var(--line); color:var(--text-dim); display:inline-flex; align-items:center; gap:4px;
+}
+.pop-btn:hover{border-color:var(--gold-bright); color:var(--text)}
+.pop-btn.primary{background:var(--teal); border-color:var(--teal); color:#eafaf7}
+.pop-btn.primary:hover{background:var(--teal-bright)}
+.pop-loading{font-size:.7rem; color:var(--text-faint); font-style:italic}
+
+/* ---------- overlays ---------- */
+.leaflet-control-attribution{background:rgba(22,16,9,.85)!important; color:var(--text-faint)!important; font-size:.65rem!important}
+.leaflet-control-attribution a{color:var(--teal-bright)!important}
+.leaflet-control-layers{background:var(--panel)!important; color:var(--text)!important; border:1px solid var(--line)!important; border-radius:8px!important}
+.leaflet-control-layers-list label{font-size:.78rem}
+.leaflet-routing-container{display:none!important}
+
+#loadingOverlay{position:absolute; inset:0; background:rgba(22,16,9,.82); display:flex; flex-direction:column; align-items:center; justify-content:center; z-index:2000; gap:12px; font-size:.85rem; color:var(--text)}
+#loadingOverlay.hidden{display:none}
+.spinner{width:36px;height:36px;border:3px solid var(--line);border-top-color:var(--gold);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+#toast{position:fixed; bottom:22px; left:50%; transform:translateX(-50%) translateY(80px); background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:10px 18px; font-size:.78rem; color:var(--text); z-index:3000; transition:transform .3s ease; pointer-events:none; max-width:80vw}
+#toast.show{transform:translateX(-50%) translateY(0)}
+#toast.success{border-color:var(--ok)}
+#toast.error{border-color:var(--error)}
+#newBadge{display:none; position:fixed; bottom:64px; left:50%; transform:translateX(-50%); background:var(--ok); color:#0c1f10; border:none; border-radius:999px; padding:8px 18px; font-size:.78rem; font-weight:700; cursor:pointer; z-index:3000; box-shadow:0 6px 16px rgba(0,0,0,.4)}
+#newBadge.show{display:block}
+
+/* ---------- dashboard ---------- */
+#dashboardView{overflow-y:auto; padding:22px 26px 40px; flex-direction:column; gap:20px}
+.dash-title{display:flex; align-items:baseline; gap:10px; margin-bottom:2px}
+.dash-title h2{font-size:1.3rem; font-weight:600}
+.dash-title span{font-size:.75rem; color:var(--text-faint)}
+.stat-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px}
+.stat-card{background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:16px 18px}
+.stat-card .sc-num{font-family:'Fraunces'; font-size:1.9rem; font-weight:600; color:var(--gold-bright); line-height:1}
+.stat-card .sc-label{font-size:.72rem; color:var(--text-faint); margin-top:6px}
+.chart-grid{display:grid; grid-template-columns:1.3fr 1fr; gap:16px}
+@media(max-width:900px){.chart-grid{grid-template-columns:1fr}}
+.chart-card{background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:16px 18px}
+.chart-card h3{font-size:.85rem; font-weight:600; color:var(--text); margin-bottom:12px; font-family:'IBM Plex Sans'}
+.chart-card canvas{max-height:320px}
+.table-card{background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:16px 18px; overflow-x:auto}
+table.simple{width:100%; border-collapse:collapse; font-size:.78rem}
+table.simple th{text-align:left; color:var(--text-faint); font-weight:600; font-size:.68rem; text-transform:uppercase; letter-spacing:.04em; padding:6px 10px; border-bottom:1px solid var(--line)}
+table.simple td{padding:7px 10px; border-bottom:1px solid var(--line-soft); color:var(--text-dim)}
+table.simple tr:hover td{color:var(--text)}
+
+@media(max-width:760px){
+  #sidebar{position:absolute; left:-280px; top:0; bottom:0; transition:left .2s; box-shadow:8px 0 24px rgba(0,0,0,.4)}
+  #sidebar.open{left:0}
+  #sidebarToggle{display:inline-flex!important}
+}
+#sidebarToggle{display:none}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <button id="sidebarToggle" class="btn btn-outline btn-sm">☰</button>
+    <h1>🏛 Museos de <em>Bolivia</em></h1>
+    <small>OSM · Wikidata · Wikipedia</small>
+  </div>
+  <div class="tabs">
+    <button class="tab-btn active" data-view="mapView">Mapa</button>
+    <button class="tab-btn" data-view="dashboardView">Dashboard</button>
+  </div>
+  <div class="hdr-controls">
+    <label for="deptSelect">Departamento</label>
+    <select id="deptSelect">
+      <option value="all">Todos</option>
+      <option value="Beni">Beni</option>
+      <option value="Chuquisaca">Chuquisaca</option>
+      <option value="Cochabamba">Cochabamba</option>
+      <option value="La Paz">La Paz</option>
+      <option value="Oruro">Oruro</option>
+      <option value="Pando">Pando</option>
+      <option value="Potosí">Potosí</option>
+      <option value="Santa Cruz">Santa Cruz</option>
+      <option value="Tarija">Tarija</option>
+    </select>
+    <button class="btn btn-outline btn-sm" id="btnRefreshNow">↻ Actualizar ahora</button>
+    <button class="btn btn-outline btn-sm" id="btnAutoToggle">⏸ Pausar auto</button>
+  </div>
+</header>
+
+<div id="statusBar">
+  <div class="dot" id="statusDot"></div>
+  <span id="statusText">Cargando museos desde OpenStreetMap…</span>
+  <span id="nextUpdate"></span>
+  <span id="countBadge">0 museos</span>
+</div>
+
+<!-- ================= MAPA ================= -->
+<div class="view active" id="mapView">
+  <aside id="sidebar">
+
+    <div class="side-block">
+      <h3>Buscar</h3>
+      <input class="search-input" id="searchInput" placeholder="Nombre o ciudad…" autocomplete="off"/>
+    </div>
+
+    <div class="side-block">
+      <h3>Tipo de museo <span style="color:var(--text-faint);font-weight:400">(OSM: museum=*)</span></h3>
+      <div class="cat-actions">
+        <button class="link-btn" id="catAll">Marcar todos</button>
+        <button class="link-btn" id="catNone">Desmarcar todos</button>
+      </div>
+      <div class="cat-list" id="catList"></div>
+    </div>
+
+    <div class="side-block loc-panel">
+      <h3>Mi ubicación y ruta</h3>
+      <p>Ubícate en el mapa y escribe el nombre de un museo para calcular la distancia y la ruta aproximada.</p>
+      <button class="btn btn-teal" id="btnLocate" style="width:100%">📍 Usar mi ubicación</button>
+      <div id="userLocStatus"></div>
+      <div style="margin-top:10px">
+        <input class="text-input" id="routeInput" list="museumDatalist" placeholder="Escribe el nombre del museo…" autocomplete="off"/>
+        <datalist id="museumDatalist"></datalist>
+        <button class="btn btn-outline btn-sm" id="btnRoute" style="width:100%;margin-top:6px">Calcular ruta</button>
+      </div>
+      <div class="route-result" id="routeResult"></div>
+      <div id="nearbyWrap" style="display:none">
+        <h3 style="margin-top:14px">Museos cercanos</h3>
+        <div class="nearby-list" id="nearbyList"></div>
+      </div>
+    </div>
+
+  </aside>
+
+  <div style="position:relative; flex:1; display:flex; flex-direction:column">
+    <div id="map"></div>
+    <div id="loadingOverlay">
+      <div class="spinner"></div>
+      <span id="loadingText">Consultando Overpass API…</span>
+    </div>
+  </div>
+</div>
+
+<!-- ================= DASHBOARD ================= -->
+<div class="view" id="dashboardView">
+  <div class="dash-title">
+    <h2>Dashboard — Museos de Bolivia</h2>
+    <span id="dashUpdated"></span>
+  </div>
+
+  <div class="stat-grid">
+    <div class="stat-card"><div class="sc-num" id="statTotalMuseums">0</div><div class="sc-label">Museos georreferenciados</div></div>
+    <div class="stat-card"><div class="sc-num" id="statWithWikidata">0</div><div class="sc-label">Con ficha Wikidata</div></div>
+    <div class="stat-card"><div class="sc-num" id="statWithWebsite">0</div><div class="sc-label">Con sitio web</div></div>
+    <div class="stat-card"><div class="sc-num" id="statCategories">0</div><div class="sc-label">Categorías distintas</div></div>
+    <div class="stat-card"><div class="sc-num" id="statDepts">9</div><div class="sc-label">Departamentos cubiertos</div></div>
+  </div>
+
+  <div class="chart-grid">
+    <div class="chart-card">
+      <h3>Museos por departamento</h3>
+      <canvas id="chartDept"></canvas>
+    </div>
+    <div class="chart-card">
+      <h3>Museos por categoría (museum=*)</h3>
+      <canvas id="chartCat"></canvas>
+    </div>
+  </div>
+
+  <div class="table-card">
+    <h3 style="margin-bottom:10px">Detalle por departamento</h3>
+    <table class="simple" id="deptTable">
+      <thead><tr><th>Departamento</th><th>Museos</th><th>Con imagen</th><th>Con sitio web</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</div>
+
+<div id="toast"></div>
+<button id="newBadge">+ <span id="newCount">0</span> museos nuevos — click para ver</button>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+<script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script>
+/* ============================================================
+   CONFIGURACIÓN
+   ============================================================ */
+const CFG = {
+  overpassUrl:    'https://overpass-api.de/api/interpreter',
+  overpassMirror: 'https://overpass.kumi.systems/api/interpreter',
+  refreshInterval: 5 * 60 * 1000,
+  boliviaBbox: [-23.0, -70.5, -9.5, -57.0], // sur, oeste, norte, este
+};
+
+// Bounding boxes rectangulares por departamento — usados como respaldo
+// cuando el elemento OSM no trae addr:state / is_in:department.
+const DEPT_BBOX = {
+  'La Paz':      [-17.5, -70.0, -13.5, -67.5],
+  'Cochabamba':  [-18.3, -66.8, -16.0, -64.5],
+  'Santa Cruz':  [-21.5, -64.5, -13.5, -57.0],
+  'Oruro':       [-21.5, -68.5, -17.0, -66.5],
+  'Potosí':      [-23.0, -68.0, -18.5, -64.5],
+  'Chuquisaca':  [-22.0, -65.5, -18.0, -63.0],
+  'Tarija':      [-23.0, -65.2, -20.5, -62.5],
+  'Beni':        [-16.0, -68.5,  -9.5, -60.0],
+  'Pando':       [-13.0, -70.5,  -9.5, -65.5],
+};
+const DEPT_ORDER = Object.keys(DEPT_BBOX);
+
+function assignDept(lat, lon) {
+  for (const d of DEPT_ORDER) {
+    const [s,w,n,e] = DEPT_BBOX[d];
+    if (lat>=s && lat<=n && lon>=w && lon<=e) return d;
+  }
+  return null;
+}
+function normalizeDeptTag(v){
+  if (!v) return null;
+  const t = v.trim();
+  const map = {
+    'la paz':'La Paz','cochabamba':'Cochabamba','santa cruz':'Santa Cruz',
+    'oruro':'Oruro','potosi':'Potosí','potosí':'Potosí','chuquisaca':'Chuquisaca',
+    'tarija':'Tarija','beni':'Beni','pando':'Pando',
+  };
+  return map[t.toLowerCase()] || null;
+}
+
+// ── Categorías de museo (tag OSM museum=*) ──
+const CAT_LABELS = {
+  history:'Historia', local:'Local / comunitario', archaeology:'Arqueología',
+  aviation:'Aviación', art:'Arte', natural_history:'Historia natural',
+  railway:'Ferroviario', medicine:'Medicina', open_air:'Aire libre',
+  aerospace:'Aeroespacial', transport:'Transporte', science:'Ciencia',
+  technology:'Tecnología', military:'Militar', biography:'Casa-museo / persona',
+  ethnographic:'Etnográfico', anthropology:'Etnográfico', geology:'Geología',
+  religious_art:'Arte religioso', craft:'Artesanía', mining:'Minería',
+  numismatic:'Numismática', textile:'Textil',
+};
+const CAT_NONE = 'Sin subtipo OSM';
+const CAT_PALETTE = [
+  '#c0503c','#7d5ba6','#6b4a2f','#3f7ab0','#cf9a44','#2f7a72',
+  '#b0724d','#8a9a4a','#c25f8f','#4a8fc2','#a3632f','#5a9c6e',
+  '#9c5a9c','#b48a3f','#4f6fa8','#7a5a3f','#3f9c8f','#c07a3f',
+];
+const catColorMap = {};
+function catColor(cat){
+  if (cat===CAT_NONE) return '#83745d';
+  if (!catColorMap[cat]) {
+    const idx = Object.keys(catColorMap).length % CAT_PALETTE.length;
+    catColorMap[cat] = CAT_PALETTE[idx];
+  }
+  return catColorMap[cat];
+}
+function museumCategory(tags){
+  const m = (tags.museum||'').toLowerCase().trim();
+  if (!m) return CAT_NONE;
+  return CAT_LABELS[m] || (m.charAt(0).toUpperCase()+m.slice(1));
+}
+
+/* ============================================================
+   ESTADO GLOBAL
+   ============================================================ */
+let MUSEUMS = [];          // todos los museos cargados {i,a,o,d,n,cat,...}
+let loadedIds = new Set();
+let activeCats = new Set();
+let currentDept = 'all';
+let searchText = '';
+let autoRefresh = true;
+let refreshTimer=null, countdownTimer=null, nextRefreshAt=null;
+let userLatLng = null;
+let userMarker = null;
+let routingControl = null;
+const wikiCache = new Map();
+let chartDept=null, chartCat=null;
+
+/* ============================================================
+   MAPA Y CAPAS BASE
+   ============================================================ */
+const map = L.map('map', {center:[-16.8,-64.5], zoom:6});
+
+const baseOSM = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  maxZoom:19,
+  attribution:'&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a> contributors (ODbL)',
+});
+const baseEsriSat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+  maxZoom:19,
+  attribution:'Tiles &copy; Esri — Source: Esri, Maxar, Earthstar Geographics, GIS User Community',
+});
+const baseEsriTopo = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', {
+  maxZoom:19,
+  attribution:'Tiles &copy; Esri — Source: Esri, DeLorme, NAVTEQ',
+});
+const baseCarto = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+  maxZoom:19, subdomains:'abcd',
+  attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
+});
+
+baseOSM.addTo(map);
+L.control.layers({
+  'OpenStreetMap (calles)': baseOSM,
+  'Esri — Satelital': baseEsriSat,
+  'Esri — Topográfico': baseEsriTopo,
+  'CARTO — Oscuro': baseCarto,
+}, {}, {position:'topright', collapsed:true}).addTo(map);
+// Nota: los tres servicios de teselas (OSM, Esri, CARTO) son endpoints públicos
+// de solo lectura que no requieren API key para este volumen de uso; se
+// respeta el fair-use de cada proveedor (maxZoom, atribución visible).
+
+const cluster = L.markerClusterGroup({
+  chunkedLoading:true, maxClusterRadius:45, spiderfyOnMaxZoom:true, showCoverageOnHover:false,
+});
+map.addLayer(cluster);
+
+function museumIcon(cat, isNew){
+  const color = catColor(cat);
+  const border = isNew ? '#0c1f10' : '#000000aa';
+  const ring = isNew ? '3px solid #6ea87a' : '2px solid rgba(0,0,0,.35)';
+  return L.divIcon({
+    className:'',
+    html:`<div style="background:${color};border:${ring};border-radius:50% 50% 50% 0;transform:rotate(-45deg);width:20px;height:20px;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(0,0,0,.5)"><span style="transform:rotate(45deg);font-size:10px">🏛</span></div>`,
+    iconSize:[20,20], iconAnchor:[10,20], popupAnchor:[0,-22],
+  });
+}
+const userIcon = L.divIcon({
+  className:'',
+  html:`<div style="width:16px;height:16px;border-radius:50%;background:#48a89c;border:3px solid #eafaf7;box-shadow:0 0 0 5px rgba(72,168,156,.3)"></div>`,
+  iconSize:[16,16], iconAnchor:[8,8],
+});
+
+/* ============================================================
+   CONSULTA OVERPASS
+   ============================================================ */
+function buildQuery(){
+  const [s,w,n,e] = CFG.boliviaBbox;
+  const bbox = `${s},${w},${n},${e}`;
+  return `[out:json][timeout:60];(node["tourism"="museum"](${bbox});way["tourism"="museum"](${bbox});relation["tourism"="museum"](${bbox}););out center qt;`;
+}
+
+async function fetchOverpass(){
+  const body = new URLSearchParams({data:buildQuery()}).toString();
+  let lastErr;
+  for (const url of [CFG.overpassUrl, CFG.overpassMirror]){
+    try{
+      const r = await fetch(url,{method:'POST',
+        headers:{'Content-Type':'application/x-www-form-urlencoded','Accept':'application/json'}, body});
+      if (!r.ok) throw new Error('HTTP '+r.status);
+      return await r.json();
+    }catch(e){ lastErr=e; console.warn(url, e.message); }
+  }
+  throw lastErr || new Error('Overpass no disponible');
+}
+
+function elementToMuseum(el){
+  const lat = el.lat ?? el.center?.lat;
+  const lon = el.lon ?? el.center?.lon;
+  if (lat==null || lon==null) return null;
+  const t = el.tags || {};
+  const dept = normalizeDeptTag(t['addr:state']) || normalizeDeptTag(t['is_in:department']) || assignDept(lat,lon);
+  return {
+    i: (el.type==='node'?'node':el.type==='way'?'way':'relation')+'/'+el.id,
+    rawId: el.id, osmType: el.type,
+    a: lat, o: lon,
+    d: dept || 'Sin ubicar',
+    n: t.name || t['name:es'] || '(sin nombre)',
+    cat: museumCategory(t),
+    street: [t['addr:street'], t['addr:housenumber']].filter(Boolean).join(' '),
+    city: t['addr:city'] || '',
+    operator: t.operator || '',
+    phone: t.phone || t['contact:phone'] || '',
+    website: t.website || t['contact:website'] || '',
+    facebook: t['contact:facebook'] || t.facebook || '',
+    instagram: t['contact:instagram'] || t.instagram || '',
+    twitter: t['contact:twitter'] || t.twitter || '',
+    hours: t.opening_hours || '',
+    wikidata: t.wikidata || '',
+    wikipedia: t.wikipedia || '',
+    image: t.image || '',
+  };
+}
+
+/* ============================================================
+   RENDERIZADO DE MARCADORES
+   ============================================================ */
+function passesFilter(m){
+  if (currentDept!=='all' && m.d!==currentDept) return false;
+  if (activeCats.size>0 && !activeCats.has(m.cat)) return false;
+  if (searchText){
+    const hay = (m.n+' '+m.city+' '+m.d).toLowerCase();
+    if (!hay.includes(searchText)) return false;
+  }
+  return true;
+}
+
+function renderAll(){
+  cluster.clearLayers();
+  let count=0;
+  for (const m of MUSEUMS){
+    if (!passesFilter(m)) continue;
+    const marker = L.marker([m.a,m.o],{icon:museumIcon(m.cat,false)});
+    marker.bindPopup(()=>buildPopup(m), {maxWidth:300, minWidth:290});
+    marker.on('popupopen', ()=>enrichPopup(m));
+    cluster.addLayer(marker);
+    count++;
+  }
+  document.getElementById('countBadge').textContent = count.toLocaleString()+' museos';
+  updateDashboard();
+}
+
+function addNewMarkers(list){
+  for (const m of list){
+    if (!passesFilter(m)) continue;
+    const marker = L.marker([m.a,m.o],{icon:museumIcon(m.cat,true)});
+    marker.bindPopup(()=>buildPopup(m,true), {maxWidth:300, minWidth:290});
+    marker.on('popupopen', ()=>enrichPopup(m));
+    cluster.addLayer(marker);
+  }
+}
+
+/* ============================================================
+   POPUP — construcción básica + enriquecimiento Wikidata/Wikipedia
+   ============================================================ */
+function esc(s){ return (s==null?'':String(s)).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+function buildPopup(m, isNew){
+  const rows = [
+    m.city ? ['Ciudad', m.city] : null,
+    m.street ? ['Dirección', m.street] : null,
+    ['Departamento', m.d],
+    m.operator ? ['Operador', m.operator] : null,
+    m.hours ? ['Horario', m.hours] : null,
+    m.phone ? ['Teléfono', m.phone] : null,
+  ].filter(Boolean).map(([k,v])=>`<div class="pop-row"><span class="pop-key">${esc(k)}</span><span class="pop-val">${esc(v)}</span></div>`).join('');
+
+  const social = [
+    m.website ? `<a class="pop-btn" href="${esc(fullUrl(m.website))}" target="_blank">🌐 Sitio web</a>` : '',
+    m.facebook ? `<a class="pop-btn" href="${esc(fullUrl(m.facebook,'facebook'))}" target="_blank">Facebook</a>` : '',
+    m.instagram ? `<a class="pop-btn" href="${esc(fullUrl(m.instagram,'instagram'))}" target="_blank">Instagram</a>` : '',
+  ].join('');
+
+  const osmUrl = `https://www.openstreetmap.org/${m.osmType}/${m.rawId}`;
+  const initialImg = m.image ? commonsFilePathFromTag(m.image) : null;
+
+  return `
+    ${initialImg?`<img class="pop-img" src="${esc(initialImg)}" onerror="this.remove()"/>`:''}
+    <div class="pop-body">
+      <span class="pop-cat" style="background:${catColor(m.cat)}22;color:${catColor(m.cat)}">${esc(m.cat)}</span>
+      ${isNew?'<span style="color:#6ea87a;font-size:.65rem;font-weight:700;margin-left:6px">NUEVO</span>':''}
+      <div class="pop-title">${esc(m.n)}</div>
+      <div class="pop-sub">${esc(m.d)}${m.city?' · '+esc(m.city):''}</div>
+      ${rows}
+      <div class="pop-btns">${social}
+        <a class="pop-btn" href="${osmUrl}" target="_blank">Ver en OSM ↗</a>
+        <a class="pop-btn" href="${osmUrl.replace('www.openstreetmap.org','www.openstreetmap.org/edit?')}" target="_blank">Editar en OSM</a>
+        <button class="pop-btn primary" onclick="window.__routeTo('${m.i}')">📍 Cómo llegar</button>
+      </div>
+      <div class="pop-wiki" id="wiki-${cssId(m.i)}">
+        ${m.wikidata ? '<div class="pop-loading">Consultando Wikidata…</div>' : ''}
+      </div>
+    </div>`;
+}
+
+function cssId(i){ return i.replace('/','-'); }
+function fullUrl(v, kind){
+  if (/^https?:\/\//i.test(v)) return v;
+  if (kind==='facebook') return 'https://facebook.com/'+v.replace(/^@/,'');
+  if (kind==='instagram') return 'https://instagram.com/'+v.replace(/^@/,'');
+  return 'https://'+v;
+}
+function commonsFilePathFromTag(tag){
+  // tag puede venir como "File:Foo.jpg" o una URL directa
+  if (/^https?:\/\//i.test(tag)) return tag;
+  const name = tag.replace(/^File:/i,'');
+  return 'https://commons.wikimedia.org/wiki/Special:FilePath/'+encodeURIComponent(name)+'?width=500';
+}
+
+async function enrichPopup(m){
+  if (!m.wikidata) return;
+  const holder = document.getElementById('wiki-'+cssId(m.i));
+  if (!holder) return;
+  try{
+    const data = await fetchWikidataBundle(m.wikidata);
+    if (!holder) return;
+    let html = `<div class="pop-wiki-label"><span class="live-dot"></span> Wikidata (${esc(m.wikidata)}) · en vivo</div>`;
+    if (data.image){
+      html = `<img class="pop-img" style="border-radius:0;margin-bottom:8px" src="${esc(data.image)}" onerror="this.remove()"/>` + html;
+    }
+    if (data.description) html += `<div class="pop-extract">${esc(data.description)}</div>`;
+    html += `<div class="pop-btns">
+        <a class="pop-btn" href="https://www.wikidata.org/wiki/${esc(m.wikidata)}" target="_blank">Ver en Wikidata</a>
+        ${data.website?`<a class="pop-btn" href="${esc(data.website)}" target="_blank">🌐 Sitio (Wikidata)</a>`:''}
+      </div>`;
+    holder.innerHTML = html;
+
+    if (data.wikipediaTitle){
+      const wp = await fetchWikipediaSummary('es', data.wikipediaTitle);
+      if (wp && holder){
+        const extra = document.createElement('div');
+        extra.className='pop-wiki';
+        extra.innerHTML = `
+          <div class="pop-wiki-label">📖 Wikipedia (ES) · en vivo</div>
+          <div class="pop-extract">${esc(wp.extract||'')}</div>
+          <div class="pop-btns"><a class="pop-btn" href="${esc(wp.url)}" target="_blank">Leer artículo ↗</a></div>`;
+        holder.appendChild(extra);
+      }
+    }
+  }catch(e){
+    holder.innerHTML = `<div class="pop-loading" style="color:var(--error)">No se pudo cargar Wikidata/Wikipedia.</div>`;
+  }
+}
+
+async function fetchWikidataBundle(qid){
+  if (wikiCache.has(qid)) return wikiCache.get(qid);
+  const url = `https://www.wikidata.org/w/api.php?action=wbgetentities&ids=${qid}&format=json&origin=*&props=claims|sitelinks|descriptions&languages=es`;
+  const r = await fetch(url);
+  if (!r.ok) throw new Error('wikidata http '+r.status);
+  const j = await r.json();
+  const ent = j.entities && j.entities[qid];
+  const out = {image:null, website:null, wikipediaTitle:null, description:null};
+  if (ent){
+    out.description = ent.descriptions?.es?.value || null;
+    const p18 = ent.claims?.P18?.[0]?.mainsnak?.datavalue?.value;
+    if (p18) out.image = commonsFilePathFromTag(p18);
+    const p856 = ent.claims?.P856?.[0]?.mainsnak?.datavalue?.value;
+    if (p856) out.website = p856;
+    const es = ent.sitelinks?.eswiki?.title;
+    if (es) out.wikipediaTitle = es;
+  }
+  wikiCache.set(qid, out);
+  return out;
+}
+
+async function fetchWikipediaSummary(lang, title){
+  const key = lang+':'+title;
+  if (wikiCache.has(key)) return wikiCache.get(key);
+  const url = `https://${lang}.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title)}`;
+  const r = await fetch(url);
+  if (!r.ok) return null;
+  const j = await r.json();
+  const out = {extract:j.extract, url:j.content_urls?.desktop?.page || `https://${lang}.wikipedia.org/wiki/${encodeURIComponent(title)}`};
+  wikiCache.set(key, out);
+  return out;
+}
+
+/* ============================================================
+   SIDEBAR — categorías, búsqueda, filtros
+   ============================================================ */
+function rebuildCategoryList(){
+  const counts = {};
+  for (const m of MUSEUMS){
+    if (currentDept!=='all' && m.d!==currentDept) continue;
+    counts[m.cat] = (counts[m.cat]||0)+1;
+  }
+  const cats = Object.keys(counts).sort((a,b)=>counts[b]-counts[a]);
+  if (activeCats.size===0) cats.forEach(c=>activeCats.add(c));
+
+  const wrap = document.getElementById('catList');
+  wrap.innerHTML = cats.map(c=>{
+    const checked = activeCats.has(c) ? 'checked' : '';
+    return `<label class="cat-row">
+      <input type="checkbox" data-cat="${esc(c)}" ${checked}/>
+      <span class="cat-dot" style="background:${catColor(c)}"></span>
+      <span class="cat-name">${esc(c)}</span>
+      <span class="cat-count">${counts[c]}</span>
+    </label>`;
+  }).join('');
+  wrap.querySelectorAll('input[type=checkbox]').forEach(cb=>{
+    cb.addEventListener('change', ()=>{
+      const c = cb.dataset.cat;
+      if (cb.checked) activeCats.add(c); else activeCats.delete(c);
+      renderAll();
+    });
+  });
+}
+
+document.getElementById('catAll').addEventListener('click', ()=>{
+  document.querySelectorAll('#catList input').forEach(cb=>{cb.checked=true; activeCats.add(cb.dataset.cat);});
+  renderAll();
+});
+document.getElementById('catNone').addEventListener('click', ()=>{
+  document.querySelectorAll('#catList input').forEach(cb=>{cb.checked=false;});
+  activeCats.clear();
+  renderAll();
+});
+
+document.getElementById('searchInput').addEventListener('input', e=>{
+  searchText = e.target.value.trim().toLowerCase();
+  renderAll();
+});
+
+document.getElementById('deptSelect').addEventListener('change', e=>{
+  currentDept = e.target.value;
+  activeCats.clear();
+  rebuildCategoryList();
+  renderAll();
+  if (currentDept!=='all' && DEPT_BBOX[currentDept]){
+    const [s,w,n,e2] = DEPT_BBOX[currentDept];
+    map.fitBounds([[s,w],[n,e2]], {padding:[20,20]});
+  } else {
+    map.setView([-16.8,-64.5], 6);
+  }
+});
+
+/* ============================================================
+   TABS Mapa / Dashboard
+   ============================================================ */
+document.querySelectorAll('.tab-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById(btn.dataset.view).classList.add('active');
+    if (btn.dataset.view==='mapView') setTimeout(()=>map.invalidateSize(), 60);
+    if (btn.dataset.view==='dashboardView') updateDashboard();
+  });
+});
+document.getElementById('sidebarToggle').addEventListener('click', ()=>{
+  document.getElementById('sidebar').classList.toggle('open');
+});
+
+/* ============================================================
+   GEOLOCALIZACIÓN + RUTA + CERCANOS
+   ============================================================ */
+function haversineKm(lat1,lon1,lat2,lon2){
+  const R=6371, toRad=d=>d*Math.PI/180;
+  const dLat=toRad(lat2-lat1), dLon=toRad(lon2-lon1);
+  const a=Math.sin(dLat/2)**2 + Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
+  return R*2*Math.asin(Math.sqrt(a));
+}
+
+document.getElementById('btnLocate').addEventListener('click', ()=>{
+  if (!navigator.geolocation){
+    showToast('Tu navegador no soporta geolocalización','error'); return;
+  }
+  document.getElementById('userLocStatus').textContent = 'Obteniendo ubicación…';
+  navigator.geolocation.getCurrentPosition(pos=>{
+    userLatLng = [pos.coords.latitude, pos.coords.longitude];
+    if (userMarker) map.removeLayer(userMarker);
+    userMarker = L.marker(userLatLng,{icon:userIcon, zIndexOffset:1000}).addTo(map).bindPopup('Tu ubicación');
+    document.getElementById('userLocStatus').textContent = '✓ Ubicación obtenida';
+    map.setView(userLatLng, 12);
+    renderNearby();
+  }, err=>{
+    document.getElementById('userLocStatus').textContent = 'No se pudo obtener la ubicación ('+err.message+')';
+    showToast('No se pudo acceder a tu ubicación','error');
+  }, {enableHighAccuracy:true, timeout:10000});
+});
+
+function rebuildMuseumDatalist(){
+  const dl = document.getElementById('museumDatalist');
+  dl.innerHTML = MUSEUMS.slice(0,3000).map(m=>`<option value="${esc(m.n)} — ${esc(m.d)}"></option>`).join('');
+}
+function findMuseumByLabel(label){
+  const clean = label.split('—')[0].trim().toLowerCase();
+  return MUSEUMS.find(m=>m.n.toLowerCase()===clean) ||
+         MUSEUMS.find(m=>m.n.toLowerCase().includes(clean));
+}
+
+document.getElementById('btnRoute').addEventListener('click', ()=>{
+  const val = document.getElementById('routeInput').value.trim();
+  if (!val){ showToast('Escribe el nombre de un museo','error'); return; }
+  const m = findMuseumByLabel(val);
+  if (!m){ showToast('No se encontró ese museo en los datos cargados','error'); return; }
+  routeTo(m);
+});
+
+window.__routeTo = function(id){
+  const m = MUSEUMS.find(x=>x.i===id);
+  if (m) routeTo(m);
+};
+
+function routeTo(m){
+  if (!userLatLng){
+    showToast('Primero usa "📍 Usar mi ubicación"','error');
+    return;
+  }
+  const km = haversineKm(userLatLng[0],userLatLng[1], m.a, m.o);
+  const box = document.getElementById('routeResult');
+  box.classList.add('show');
+  box.innerHTML = `<div class="rr-title">${esc(m.n)}</div>
+    <div>Distancia en línea recta: <b>${km.toFixed(1)} km</b></div>
+    <div id="routeStatus" style="margin-top:4px;color:var(--text-faint)">Calculando ruta por calle…</div>`;
+
+  if (routingControl){ map.removeControl(routingControl); routingControl=null; }
+
+  let settled = false;
+  const fallbackTimer = setTimeout(()=>{
+    if (settled) return;
+    settled = true;
+    document.getElementById('routeStatus').textContent = 'Ruta por calle no disponible — se muestra distancia directa.';
+  }, 9000);
+
+  try{
+    routingControl = L.Routing.control({
+      waypoints:[L.latLng(userLatLng[0],userLatLng[1]), L.latLng(m.a,m.o)],
+      routeWhileDragging:false, addWaypoints:false, draggableWaypoints:false,
+      show:false, fitSelectedRoutes:true,
+      createMarker: ()=>null,
+      lineOptions:{styles:[{color:'#e8b862', weight:4, opacity:.85}]},
+    }).addTo(map);
+
+    routingControl.on('routesfound', e=>{
+      if (settled) return;
+      settled = true; clearTimeout(fallbackTimer);
+      const r = e.routes[0];
+      const kmRoute = (r.summary.totalDistance/1000).toFixed(1);
+      const minutes = Math.round(r.summary.totalTime/60);
+      const st = document.getElementById('routeStatus');
+      if (st) st.innerHTML = `Ruta por calle: <b>${kmRoute} km</b> · ~${minutes} min en auto`;
+    });
+    routingControl.on('routingerror', ()=>{
+      if (settled) return;
+      settled = true; clearTimeout(fallbackTimer);
+      const st = document.getElementById('routeStatus');
+      if (st) st.textContent = 'Ruta por calle no disponible — se muestra distancia directa.';
+    });
+  }catch(e){
+    const st = document.getElementById('routeStatus');
+    if (st) st.textContent = 'Ruta por calle no disponible — se muestra distancia directa.';
+  }
+}
+
+function renderNearby(){
+  if (!userLatLng) return;
+  document.getElementById('nearbyWrap').style.display='block';
+  const visible = MUSEUMS.filter(passesFilter);
+  const withKm = visible.map(m=>({m, km:haversineKm(userLatLng[0],userLatLng[1],m.a,m.o)}));
+  withKm.sort((a,b)=>a.km-b.km);
+  const top = withKm.slice(0,8);
+  document.getElementById('nearbyList').innerHTML = top.map(({m,km})=>`
+    <div class="nearby-item" data-id="${esc(m.i)}">
+      <div class="ni-name">${esc(m.n)}</div>
+      <div class="ni-meta"><span>${esc(m.d)}</span><span class="ni-km">${km.toFixed(1)} km</span></div>
+    </div>`).join('');
+  document.querySelectorAll('.nearby-item').forEach(it=>{
+    it.addEventListener('click', ()=>{
+      const m = MUSEUMS.find(x=>x.i===it.dataset.id);
+      if (!m) return;
+      map.setView([m.a,m.o], 15);
+      routeTo(m);
+    });
+  });
+}
+
+/* ============================================================
+   DASHBOARD
+   ============================================================ */
+function updateDashboard(){
+  const visible = MUSEUMS; // dashboard siempre muestra el total cargado
+  document.getElementById('statTotalMuseums').textContent = visible.length.toLocaleString();
+  document.getElementById('statWithWikidata').textContent = visible.filter(m=>m.wikidata).length.toLocaleString();
+  document.getElementById('statWithWebsite').textContent = visible.filter(m=>m.website).length.toLocaleString();
+  const catSet = new Set(visible.map(m=>m.cat));
+  document.getElementById('statCategories').textContent = catSet.size;
+  document.getElementById('dashUpdated').textContent = 'Actualizado ' + new Date().toLocaleTimeString('es-BO');
+
+  const byDept = {};
+  for (const d of DEPT_ORDER) byDept[d] = {total:0, img:0, web:0};
+  byDept['Sin ubicar'] = {total:0, img:0, web:0};
+  for (const m of visible){
+    if (!byDept[m.d]) byDept[m.d] = {total:0,img:0,web:0};
+    byDept[m.d].total++;
+    if (m.image || m.wikidata) byDept[m.d].img++;
+    if (m.website) byDept[m.d].web++;
+  }
+  const deptLabels = Object.keys(byDept).filter(d=>byDept[d].total>0).sort((a,b)=>byDept[b].total-byDept[a].total);
+  const deptData = deptLabels.map(d=>byDept[d].total);
+
+  const byCat = {};
+  for (const m of visible) byCat[m.cat]=(byCat[m.cat]||0)+1;
+  const catLabels = Object.keys(byCat).sort((a,b)=>byCat[b]-byCat[a]);
+  const catData = catLabels.map(c=>byCat[c]);
+  const catColors = catLabels.map(c=>catColor(c));
+
+  const ctx1 = document.getElementById('chartDept');
+  const ctx2 = document.getElementById('chartCat');
+  if (window.Chart && ctx1 && ctx2){
+    if (chartDept) chartDept.destroy();
+    if (chartCat) chartCat.destroy();
+    Chart.defaults.color = '#b3a48c';
+    Chart.defaults.font.family = "'IBM Plex Sans'";
+    chartDept = new Chart(ctx1, {
+      type:'bar',
+      data:{labels:deptLabels, datasets:[{label:'Museos', data:deptData, backgroundColor:'#cf9a44', borderRadius:4}]},
+      options:{indexAxis:'y', plugins:{legend:{display:false}}, scales:{x:{grid:{color:'#332616'}}, y:{grid:{display:false}}}}
+    });
+    chartCat = new Chart(ctx2, {
+      type:'doughnut',
+      data:{labels:catLabels, datasets:[{data:catData, backgroundColor:catColors, borderColor:'#211810', borderWidth:2}]},
+      options:{plugins:{legend:{position:'right', labels:{boxWidth:10, font:{size:10}}}}}
+    });
+  }
+
+  const tbody = document.querySelector('#deptTable tbody');
+  tbody.innerHTML = deptLabels.map(d=>`
+    <tr><td>${esc(d)}</td><td>${byDept[d].total}</td><td>${byDept[d].img}</td><td>${byDept[d].web}</td></tr>
+  `).join('');
+}
+
+/* ============================================================
+   CARGA + AUTO-ACTUALIZACIÓN
+   ============================================================ */
+async function loadMuseums(initial){
+  setStatus('loading', initial ? 'Consultando Overpass API (museos de Bolivia)…' : 'Verificando nuevos museos en OSM…');
+  try{
+    const data = await fetchOverpass();
+    const nuevos = [];
+    for (const el of (data.elements||[])){
+      const m = elementToMuseum(el);
+      if (!m) continue;
+      if (loadedIds.has(m.i)) continue;
+      loadedIds.add(m.i);
+      MUSEUMS.push(m);
+      nuevos.push(m);
+    }
+    rebuildCategoryList();
+    rebuildMuseumDatalist();
+    if (initial){
+      renderAll();
+      document.getElementById('loadingOverlay').classList.add('hidden');
+      setStatus('ok', '✓ '+MUSEUMS.length.toLocaleString()+' museos cargados desde OpenStreetMap');
+      showToast('✓ '+MUSEUMS.length.toLocaleString()+' museos cargados','success');
+    } else if (nuevos.length>0){
+      addNewMarkers(nuevos);
+      document.getElementById('newCount').textContent = nuevos.length;
+      document.getElementById('newBadge').classList.add('show');
+      setStatus('ok','✓ '+nuevos.length+' museo(s) nuevo(s) detectado(s) en OSM');
+      showToast('✨ '+nuevos.length+' museo(s) nuevo(s) en OSM','success');
+      updateDashboard();
+      if (userLatLng) renderNearby();
+    } else {
+      setStatus('ok', '✓ Sin cambios — '+MUSEUMS.length.toLocaleString()+' museos');
+    }
+  }catch(e){
+    setStatus('error', 'Error consultando Overpass: '+e.message);
+    if (initial) document.getElementById('loadingOverlay').classList.add('hidden');
+    showToast('No se pudo conectar con Overpass API','error');
+  }
+  scheduleNext();
+}
+
+document.getElementById('newBadge').addEventListener('click', ()=>{
+  document.getElementById('newBadge').classList.remove('show');
+});
+
+document.getElementById('btnRefreshNow').addEventListener('click', ()=>{
+  clearTimeout(refreshTimer); clearInterval(countdownTimer);
+  loadMuseums(false);
+});
+
+document.getElementById('btnAutoToggle').addEventListener('click', ()=>{
+  autoRefresh = !autoRefresh;
+  const btn = document.getElementById('btnAutoToggle');
+  if (autoRefresh){
+    btn.textContent='⏸ Pausar auto'; scheduleNext();
+    showToast('Auto-actualización activada (cada 5 min)','success');
+  } else {
+    btn.textContent='▶ Reanudar auto';
+    clearTimeout(refreshTimer); clearInterval(countdownTimer);
+    document.getElementById('nextUpdate').textContent='Pausado';
+  }
+});
+
+function scheduleNext(){
+  clearTimeout(refreshTimer); clearInterval(countdownTimer);
+  if (!autoRefresh) return;
+  nextRefreshAt = Date.now()+CFG.refreshInterval;
+  refreshTimer = setTimeout(()=>loadMuseums(false), CFG.refreshInterval);
+  countdownTimer = setInterval(()=>{
+    const rem = Math.max(0, Math.round((nextRefreshAt-Date.now())/1000));
+    const mm = Math.floor(rem/60), ss = rem%60;
+    document.getElementById('nextUpdate').textContent = 'Próxima revisión: '+mm+':'+String(ss).padStart(2,'0');
+    if (rem===0) clearInterval(countdownTimer);
+  }, 1000);
+}
+
+function setStatus(type, text){
+  document.getElementById('statusDot').className = 'dot '+type;
+  document.getElementById('statusText').textContent = text;
+}
+let toastTimer;
+function showToast(msg, type=''){
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.className = 'show '+type;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>{ el.className=''; }, 3800);
+}
+
+/* ============================================================
+   INICIO
+   ============================================================ */
+loadMuseums(true);
+</script>
+</body>
+</html>
