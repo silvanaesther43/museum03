@@ -149,6 +149,8 @@ select:focus{outline:1px solid var(--gold-bright)}
 .pop-row:last-of-type{border-bottom:none}
 .pop-key{color:var(--text-faint); flex-shrink:0; min-width:74px}
 .pop-val{color:var(--text-dim); text-align:right; flex:1; word-break:break-word}
+.pop-val a{color:var(--teal-bright); text-decoration:none}
+.pop-val a:hover{text-decoration:underline}
 .pop-wiki{margin-top:9px; padding-top:9px; border-top:1px dashed var(--line-soft)}
 .pop-wiki-label{font-size:.62rem; text-transform:uppercase; letter-spacing:.05em; color:var(--teal-bright); font-weight:600; display:flex; align-items:center; gap:5px; margin-bottom:5px}
 .live-dot{width:6px;height:6px;border-radius:50%;background:var(--ok);display:inline-block;animation:pulse 1.4s infinite}
@@ -582,6 +584,8 @@ function featureToMuseum(f){
     facebook: t['contact:facebook'] || t.facebook || '',
     instagram: t['contact:instagram'] || t.instagram || '',
     twitter: t['contact:twitter'] || t.twitter || '',
+    tiktok: t['contact:tiktok'] || t.tiktok || '',
+    url: t.url || t['contact:url'] || '',   // nota de prensa, página de turismo, video…
     hours: t.opening_hours || '',
     wikidata: t.wikidata || '',
     wikipedia: t.wikipedia || '',
@@ -643,10 +647,16 @@ function buildPopup(m, isNew){
     m.phone ? ['Teléfono', m.phone] : null,
   ].filter(Boolean).map(([k,v])=>`<div class="pop-row"><span class="pop-key">${esc(k)}</span><span class="pop-val">${esc(v)}</span></div>`).join('');
 
+  // Etiqueta url de OSM: en muchos museos con ficha escasa es la única referencia.
+  const masInfo = m.url && m.url!==m.website
+    ? `<div class="pop-row"><span class="pop-key">Más info</span><span class="pop-val"><a href="${esc(fullUrl(m.url))}" target="_blank" rel="noopener">${esc(hostOf(m.url))} ↗</a></span></div>`
+    : '';
+
   const social = [
     m.website ? `<a class="pop-btn" href="${esc(fullUrl(m.website))}" target="_blank">🌐 Sitio web</a>` : '',
     m.facebook ? `<a class="pop-btn" href="${esc(fullUrl(m.facebook,'facebook'))}" target="_blank">Facebook</a>` : '',
     m.instagram ? `<a class="pop-btn" href="${esc(fullUrl(m.instagram,'instagram'))}" target="_blank">Instagram</a>` : '',
+    m.tiktok ? `<a class="pop-btn" href="${esc(fullUrl(m.tiktok,'tiktok'))}" target="_blank">TikTok</a>` : '',
   ].join('');
 
   const osmUrl = `https://www.openstreetmap.org/${m.osmType}/${m.rawId}`;
@@ -659,7 +669,7 @@ function buildPopup(m, isNew){
       ${isNew?'<span style="color:#6ea87a;font-size:.65rem;font-weight:700;margin-left:6px">NUEVO</span>':''}
       <div class="pop-title">${esc(m.n)}</div>
       <div class="pop-sub">${esc(m.d)}${m.city?' · '+esc(m.city):''}</div>
-      ${rows}
+      ${rows}${masInfo}
       <div class="pop-btns">${social}
         <a class="pop-btn" href="${osmUrl}" target="_blank">Ver en OSM ↗</a>
         <a class="pop-btn" href="${osmUrl.replace('www.openstreetmap.org','www.openstreetmap.org/edit?')}" target="_blank">Editar en OSM</a>
@@ -676,7 +686,11 @@ function fullUrl(v, kind){
   if (/^https?:\/\//i.test(v)) return v;
   if (kind==='facebook') return 'https://facebook.com/'+v.replace(/^@/,'');
   if (kind==='instagram') return 'https://instagram.com/'+v.replace(/^@/,'');
+  if (kind==='tiktok') return 'https://www.tiktok.com/@'+v.replace(/^@/,'');
   return 'https://'+v;
+}
+function hostOf(v){
+  try{ return new URL(fullUrl(v)).hostname.replace(/^www\./,''); }catch(e){ return v; }
 }
 function commonsFilePathFromTag(tag){
   // tag puede venir como "File:Foo.jpg" o una URL directa

@@ -2,7 +2,8 @@
 // Lo ejecuta GitHub Actions (.github/workflows/actualizar-museos.yml). A mano:
 //   node scripts/actualizar_museos.mjs                       → consulta Overpass
 //   node scripts/actualizar_museos.mjs respuesta.json        → usa una respuesta guardada
-// Solo reescribe el archivo si cambió algún museo.
+// Solo reescribe el archivo si cambió algún museo. Si Overpass no responde o responde
+// incompleto, conserva el archivo anterior (aviso, no error) y se reintenta en la próxima ejecución.
 import fs from 'node:fs';
 import path from 'node:path';
 import vm from 'node:vm';
@@ -10,10 +11,10 @@ import { fileURLToPath } from 'node:url';
 
 const RAIZ = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SALIDA = path.join(RAIZ, 'data', 'museos.geojson');
+// overpass-api.de suele responder 502 por ratos cuando está saturado: más intentos.
 const SERVIDORES = [
-  'https://overpass-api.de/api/interpreter',
-  'https://overpass.private.coffee/api/interpreter',
-  'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
+  {url:'https://overpass-api.de/api/interpreter', intentos:4},
+  {url:'https://maps.mail.ru/osm/tools/overpass/api/interpreter', intentos:2},
 ];
 // Solo museos dentro del límite nacional de Bolivia en OSM.
 const CONSULTA = '[out:json][timeout:90];area["ISO3166-1"="BO"][admin_level=2]->.bo;nwr["tourism"="museum"](area.bo);out center qt;';
@@ -23,8 +24,8 @@ const MIN_PROPORCION = 0.8; // si llegan muchos menos museos que antes, la respu
 /* ---------- Overpass ---------- */
 async function consultarOverpass(){
   const body = new URLSearchParams({data: CONSULTA}).toString();
-  for (const url of SERVIDORES){
-    for (let intento = 1; intento <= 2; intento++){
+  for (const {url, intentos} of SERVIDORES){
+    for (let intento = 1; intento <= intentos; intento++){
       try{
         const r = await fetch(url, {
           method:'POST', body, signal: AbortSignal.timeout(150_000),
@@ -40,7 +41,7 @@ async function consultarOverpass(){
         return j;
       }catch(e){
         console.warn(`${url} (intento ${intento}): ${e.message}`);
-        if (intento === 1) await new Promise(res=>setTimeout(res, 20_000));
+        if (intento < intentos) await new Promise(res=>setTimeout(res, 30_000*intento));
       }
     }
   }
@@ -90,9 +91,18 @@ function asignarDepartamento(lat, lon){
 }
 
 /* ---------- Principal ---------- */
-const datos = process.argv[2]
-  ? JSON.parse(fs.readFileSync(process.argv[2], 'utf8'))
-  : await consultarOverpass();
+function conservar(motivo){
+  // ::warning:: queda como aviso en el resumen de GitHub Actions sin marcar la ejecución como fallida.
+  console.log(`::warning::${motivo}. Se conserva data/museos.geojson; se reintentará en la próxima ejecución.`);
+  process.exit(0);
+}
+
+let datos;
+if (process.argv[2]) datos = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+else {
+  try{ datos = await consultarOverpass(); }
+  catch(e){ conservar(e.message); }
+}
 
 const features = [];
 for (const el of datos.elements){
@@ -111,7 +121,7 @@ features.sort((a,b)=>(a.properties.osm_type+a.properties.osm_id).localeCompare(b
 
 const anterior = fs.existsSync(SALIDA) ? JSON.parse(fs.readFileSync(SALIDA, 'utf8')) : null;
 if (anterior && features.length < anterior.features.length*MIN_PROPORCION)
-  throw new Error(`Solo ${features.length} museos (antes ${anterior.features.length}): se conserva el archivo anterior`);
+  conservar(`Overpass devolvió solo ${features.length} museos (antes ${anterior.features.length})`);
 if (anterior && JSON.stringify(anterior.features)===JSON.stringify(features)){
   console.log(`Sin cambios: ${features.length} museos`);
   process.exit(0);
