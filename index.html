@@ -294,6 +294,9 @@ details.side-block[open] > summary h3{margin-bottom:9px}
 .leaflet-bar a{background:var(--panel)!important; color:var(--text)!important; border-bottom-color:var(--line)!important}
 .leaflet-bar a:hover{background:var(--bg3)!important}
 .leaflet-bar a.leaflet-disabled{color:var(--text-faint)!important}
+.leaflet-bar a.loc-ctl{display:flex; align-items:center; justify-content:center}
+.leaflet-bar a.loc-ctl.on{color:var(--teal-bright)!important; background:rgba(72,168,156,.18)!important}
+.leaflet-bar a.loc-ctl.buscando svg{animation:pulse 1s infinite}
 .leaflet-control-attribution{background:rgba(22,16,9,.85)!important; color:var(--text-faint)!important; font-size:.68rem!important}
 .leaflet-control-attribution a{color:var(--teal-bright)!important}
 .leaflet-control-layers{background:var(--panel)!important; color:var(--text)!important; border:1px solid var(--line)!important; border-radius:8px!important}
@@ -423,14 +426,14 @@ table.simple tfoot td{font-weight:600; color:var(--text); border-top:1px solid v
 
     <div class="side-block">
       <h3>Mi ubicación y ruta</h3>
-      <button class="btn btn-teal" id="btnLocate" style="width:100%">📍 Usar mi ubicación</button>
+      <button class="btn btn-teal" id="btnLocate" style="width:100%">📍 Activar mi ubicación</button>
       <div id="userLocStatus"></div>
       <input class="text-input" id="routeInput" list="museumDatalist" placeholder="Escribe el nombre del museo…" autocomplete="off" style="margin-top:10px"/>
       <datalist id="museumDatalist"></datalist>
       <button class="btn btn-outline btn-sm" id="btnRoute" style="width:100%;margin-top:6px">Calcular ruta</button>
       <div class="route-result" id="routeResult"></div>
       <div id="nearbyWrap" hidden>
-        <h3 style="margin-top:14px">Museos cercanos</h3>
+        <h3 style="margin-top:14px">Museos cercanos <span class="muted">· toca uno para ver la ruta</span></h3>
         <div class="res-list" id="nearbyList"></div>
       </div>
     </div>
@@ -527,7 +530,7 @@ table.simple tfoot td{font-weight:600; color:var(--text); border-top:1px solid v
       <span><kbd>1</kbd> … <kbd>9</kbd></span><span>Ir a un departamento</span>
       <span><kbd>0</kbd></span><span>Toda Bolivia</span>
       <span><kbd>M</kbd> / <kbd>E</kbd></span><span>Mapa / Estadísticas</span>
-      <span><kbd>U</kbd></span><span>Usar mi ubicación</span>
+      <span><kbd>U</kbd></span><span>Activar o desactivar mi ubicación</span>
       <span><kbd>R</kbd></span><span>Buscar cambios en OSM ahora</span>
       <span><kbd>H</kbd></span><span>Abrir «Resaltar» (lista de casillas)</span>
       <span><kbd>W</kbd></span><span>Resaltar los que tienen artículo en Wikipedia</span>
@@ -1041,10 +1044,13 @@ function resItemHtml(m, km, activo){
 }
 const kmDesde = m=>userLatLng ? haversineKm(userLatLng[0],userLatLng[1],m.a,m.o) : null;
 
+// Con la ubicación activa, del más cercano al más lejano; si no, por nombre.
 function renderResults(){
   resItems = MUSEUMS.filter(passesFilter).map(m=>({m, km:kmDesde(m)}))
-    .sort((a,b)=>noDestacado(a.m)-noDestacado(b.m) || sinNombre(a.m)-sinNombre(b.m) || a.m.n.localeCompare(b.m.n,'es'));
-  document.getElementById('resCount').textContent = '('+resItems.length.toLocaleString()+')';
+    .sort((a,b)=>noDestacado(a.m)-noDestacado(b.m)
+      || (userLatLng ? a.km-b.km : sinNombre(a.m)-sinNombre(b.m) || a.m.n.localeCompare(b.m.n,'es')));
+  document.getElementById('resCount').textContent =
+    '('+resItems.length.toLocaleString()+')'+(userLatLng ? ' · del más cercano al más lejano' : '');
   const wrap = document.getElementById('resList');
   if (!resItems.length){
     wrap.innerHTML = '<div class="res-empty">Ningún museo coincide con la búsqueda y los filtros.</div>';
@@ -1498,27 +1504,97 @@ function haversineKm(lat1,lon1,lat2,lon2){
   return R*2*Math.asin(Math.sqrt(a));
 }
 
-function locate(then){
-  if (!navigator.geolocation){
-    showToast('Tu navegador no soporta geolocalización','error'); return;
+// La ubicación queda activada y sigue a la persona (watchPosition) hasta que la desactive:
+// mientras tanto la lista va del museo más cercano al más lejano.
+let watchId = null, userCircle = null, alUbicar = null;   // alUbicar: pendiente de la primera posición
+const LOC_ERR = {1:'no diste permiso de ubicación', 2:'no se pudo determinar la posición', 3:'tardó demasiado'};
+
+function setLocState(estado, detalle){
+  const btn = document.getElementById('btnLocate'), st = document.getElementById('userLocStatus');
+  const ctl = document.getElementById('locCtl');
+  btn.classList.toggle('btn-teal', estado!=='activa');
+  btn.classList.toggle('btn-outline', estado==='activa');
+  btn.textContent = estado==='activa' ? '📍 Ubicación activada · Desactivar'
+    : estado==='buscando' ? 'Buscando tu ubicación…' : '📍 Activar mi ubicación';
+  st.textContent = estado==='activa' ? '✓ La lista va del museo más cercano al más lejano'
+    : estado==='error' ? 'No se pudo activar la ubicación: '+detalle : '';
+  if (ctl){
+    ctl.classList.toggle('on', estado==='activa');
+    ctl.classList.toggle('buscando', estado==='buscando');
+    ctl.title = estado==='activa' ? 'Desactivar mi ubicación (U)' : 'Activar mi ubicación (U)';
   }
-  const st = document.getElementById('userLocStatus');
-  st.textContent = 'Obteniendo ubicación…';
-  navigator.geolocation.getCurrentPosition(pos=>{
-    userLatLng = [pos.coords.latitude, pos.coords.longitude];
-    if (userMarker) map.removeLayer(userMarker);
-    userMarker = L.marker(userLatLng,{icon:userIcon, zIndexOffset:1000}).addTo(map).bindPopup('Tu ubicación');
-    st.textContent = '✓ Ubicación obtenida';
-    renderResults();
-    renderNearby();
-    if (then) then();
-    else map.setView(userLatLng, 12);
-  }, err=>{
-    st.textContent = 'No se pudo obtener la ubicación ('+err.message+')';
-    showToast('No se pudo acceder a tu ubicación','error');
-  }, {enableHighAccuracy:true, timeout:10000});
 }
-document.getElementById('btnLocate').addEventListener('click', ()=>locate());
+
+// opts.then: qué hacer con la primera posición (por ejemplo, calcular una ruta);
+// opts.silencioso: no mover el mapa (al activarse sola al abrir la página).
+function activarUbicacion(opts={}){
+  if (!navigator.geolocation){ showToast('Tu navegador no soporta geolocalización','error'); return; }
+  if (watchId!==null){
+    if (opts.then){ if (userLatLng) opts.then(); else alUbicar = opts.then; }   // aún buscando: se hace al llegar
+    return;
+  }
+  alUbicar = opts.then || null;
+  setLocState('buscando');
+  let primera = true;
+  watchId = navigator.geolocation.watchPosition(pos=>{
+    const nueva = [pos.coords.latitude, pos.coords.longitude];
+    // Con el GPS la posición cambia a cada rato: las listas se rehacen al moverse más de 30 m.
+    const movio = !userLatLng || haversineKm(userLatLng[0], userLatLng[1], nueva[0], nueva[1]) > 0.03;
+    userLatLng = nueva;
+    if (!userMarker) userMarker = L.marker(nueva, {icon:userIcon, zIndexOffset:1000, keyboard:false}).addTo(map).bindPopup('Tu ubicación');
+    else userMarker.setLatLng(nueva);
+    const radio = Math.min(pos.coords.accuracy || 0, 2000);
+    if (!userCircle) userCircle = L.circle(nueva, {radius:radio, color:'#48a89c', weight:1, opacity:.5, fillOpacity:.1, interactive:false}).addTo(map);
+    else userCircle.setLatLng(nueva).setRadius(radio);
+    if (primera || movio){ renderResults(); renderNearby(); }
+    if (primera){
+      primera = false;
+      setLocState('activa');
+      const luego = alUbicar;
+      alUbicar = null;
+      if (luego) luego();
+      else if (!opts.silencioso) map.setView(nueva, Math.max(map.getZoom(), 13), {animate:!reduceMotion});
+    }
+  }, err=>{
+    if (!primera && err.code!==1) return;   // con posición ya obtenida, un corte del GPS no la apaga
+    desactivarUbicacion();
+    setLocState('error', LOC_ERR[err.code] || err.message);
+    if (!opts.silencioso) showToast('No se pudo acceder a tu ubicación: '+(LOC_ERR[err.code] || err.message),'error');
+  }, {enableHighAccuracy:true, timeout:15000, maximumAge:30000});
+}
+function desactivarUbicacion(){
+  if (watchId!==null) navigator.geolocation.clearWatch(watchId);
+  watchId = null; userLatLng = null; alUbicar = null;
+  if (userMarker){ map.removeLayer(userMarker); userMarker = null; }
+  if (userCircle){ map.removeLayer(userCircle); userCircle = null; }
+  quitarRuta();
+  setLocState('off');
+  renderResults();
+  renderNearby();
+}
+function toggleUbicacion(){
+  if (watchId!==null) desactivarUbicacion(); else activarUbicacion();
+}
+document.getElementById('btnLocate').addEventListener('click', toggleUbicacion);
+
+// Botón ◎ en el mapa, bajo el zoom: así se activa también en el celular sin abrir el panel.
+const UbicacionCtl = L.Control.extend({
+  options:{position:'topleft'},
+  onAdd(){
+    const div = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
+    div.innerHTML = `<a href="#" id="locCtl" class="loc-ctl" role="button" title="Activar mi ubicación (U)" aria-label="Mi ubicación">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="8"/></svg></a>`;
+    L.DomEvent.disableClickPropagation(div);
+    L.DomEvent.on(div.firstElementChild, 'click', e=>{ L.DomEvent.preventDefault(e); toggleUbicacion(); });
+    return div;
+  },
+});
+new UbicacionCtl().addTo(map);
+
+// Si la persona ya dio permiso antes en este navegador, la ubicación se activa sola.
+navigator.permissions?.query({name:'geolocation'})
+  .then(p=>{ if (p.state==='granted') activarUbicacion({silencioso:true}); })
+  .catch(()=>{});
 
 window.__routeTo = function(id){
   const m = MUSEUMS.find(x=>x.i===id);
@@ -1555,7 +1631,7 @@ window.__quitarRuta = quitarRuta;
 
 const minTxt = min=>min<60 ? `~${min} min` : `~${Math.floor(min/60)} h ${min%60} min`;
 function routeTo(m){
-  if (!userLatLng){ locate(()=>routeTo(m)); return; }   // pide la ubicación y sigue
+  if (!userLatLng){ activarUbicacion({then:()=>routeTo(m)}); return; }   // pide la ubicación y sigue
   closeSheet();
   map.closePopup();
   const km = haversineKm(userLatLng[0],userLatLng[1], m.a, m.o);
@@ -1867,7 +1943,7 @@ document.addEventListener('keydown', e=>{
   }
   else if (k==='m') switchView('mapView');
   else if (k==='e') switchView('dashboardView');
-  else if (k==='u'){ switchView('mapView'); locate(); }
+  else if (k==='u'){ switchView('mapView'); toggleUbicacion(); }
   else if (k==='r') loadMuseums(false, true);
   else if (k==='f') toggleFullscreen();
   else if (k==='h'){ switchView('mapView'); toggleResaltarPanel(); }
