@@ -4,7 +4,7 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
 <title>Museos de Bolivia — Geoportal Cultural</title>
-<meta name="description" content="Mapa en vivo de los museos de Bolivia con datos de OpenStreetMap, Wikidata y Wikipedia: busca por nombre, departamento o tipo, mira horarios y llega con Google Maps."/>
+<meta name="description" content="Mapa en vivo de los museos de Bolivia con datos de OpenStreetMap, Wikidata y Wikipedia: busca por nombre, departamento o tipo, mira horarios y calcula la ruta hasta cada museo."/>
 <meta name="theme-color" content="#161009"/>
 <!-- Vista previa al compartir el enlace (WhatsApp, Facebook, X) -->
 <meta property="og:type" content="website"/>
@@ -90,7 +90,7 @@ select:focus{outline:1px solid var(--gold-bright)}
 }
 .btn:hover{background:var(--gold-bright)}
 .btn-outline{background:transparent; border:1px solid var(--line); color:var(--text-dim)}
-.btn-outline:hover{border-color:var(--teal-bright); color:var(--text)}
+.btn-outline:hover{border-color:var(--teal-bright); color:var(--text); background:var(--bg3)}
 .btn-teal{background:var(--teal); color:#eafaf7}
 .btn-teal:hover{background:var(--teal-bright)}
 .btn:disabled{opacity:.4; cursor:not-allowed}
@@ -166,18 +166,22 @@ details.side-block[open] > summary h3{margin-bottom:9px}
 }
 .route-result.show{display:block}
 .route-result .rr-title{color:var(--gold-bright); font-weight:600; margin-bottom:4px}
+.route-result .rr-line{display:flex; justify-content:space-between; gap:8px}
+.route-result .rr-line b{font-family:'IBM Plex Mono'; font-weight:500; color:var(--text)}
+.route-result .link-btn{margin-top:6px}
 
-/* lista de museos (resultados) */
+/* lista de museos (resultados y cercanos): el borde izquierdo lleva el color del tipo */
 .res-list{display:flex; flex-direction:column; gap:5px}
 .res-item{
   display:flex; align-items:flex-start; gap:9px; width:100%; text-align:left;
-  background:var(--bg); border:1px solid var(--line-soft); border-radius:7px; padding:8px 10px;
+  background:var(--bg); border:1px solid var(--line-soft); border-left:4px solid var(--cat, var(--line)); border-radius:7px; padding:8px 10px;
   color:inherit; font:inherit; cursor:pointer; transition:border-color .15s, background .15s;
 }
-.res-item:hover, .res-item.active{border-color:var(--gold); background:var(--bg2)}
+.res-item:hover, .res-item.active{border-color:var(--gold); border-left-color:var(--cat, var(--gold)); background:var(--bg2)}
 .res-item .cat-dot{margin-top:5px}
 .res-main{flex:1; min-width:0}
 .res-name{display:block; font-size:.84rem; color:var(--text); font-weight:500; line-height:1.3}
+.res-cat{display:block; margin-top:3px; font-size:.7rem; font-weight:600; letter-spacing:.03em; text-transform:uppercase; color:var(--text-dim)}
 .res-meta{display:flex; justify-content:space-between; gap:8px; margin-top:3px; font-size:.74rem; color:var(--text-faint)}
 .res-km{color:var(--teal-bright); font-family:'IBM Plex Mono'; flex-shrink:0}
 .res-new{color:var(--ok); font-size:.66rem; font-weight:700; letter-spacing:.04em; margin-left:6px}
@@ -418,9 +422,17 @@ table.simple tfoot td{font-weight:600; color:var(--text); border-top:1px solid v
     </div>
 
     <div class="side-block">
+      <h3>Mi ubicación y ruta</h3>
       <button class="btn btn-teal" id="btnLocate" style="width:100%">📍 Usar mi ubicación</button>
       <div id="userLocStatus"></div>
+      <input class="text-input" id="routeInput" list="museumDatalist" placeholder="Escribe el nombre del museo…" autocomplete="off" style="margin-top:10px"/>
+      <datalist id="museumDatalist"></datalist>
+      <button class="btn btn-outline btn-sm" id="btnRoute" style="width:100%;margin-top:6px">Calcular ruta</button>
       <div class="route-result" id="routeResult"></div>
+      <div id="nearbyWrap" hidden>
+        <h3 style="margin-top:14px">Museos cercanos</h3>
+        <div class="res-list" id="nearbyList"></div>
+      </div>
     </div>
 
     <details class="side-block" id="catBlock">
@@ -570,20 +582,26 @@ const CAT_LABELS = {
   zoology:'Zoología', botany:'Botánica',
 };
 const CAT_NONE = 'Sin clasificar';
-// Tableau 10: colores que se distinguen entre sí. Los 9 tipos más comunes tienen color propio
-// y el resto comparte el gris; así no hay seis marrones parecidos.
-const CAT_PALETTE = ['#e15759','#4e79a7','#edc948','#59a14f','#f28e2b','#b07aa1','#76b7b2','#ff9da7','#9c755f'];
-const CAT_OTHER = '#a8a29a', CAT_NONE_COLOR = '#7f7466';
+// Cada tipo con su propio color (20 colores distintos de Sasha Trubetskoy, en su orden de
+// contraste): los tipos más comunes reciben los más fáciles de distinguir.
+const CAT_PALETTE = ['#e6194b','#3cb44b','#ffe119','#4363d8','#f58231','#911eb4','#42d4f4','#f032e6','#bfef45',
+  '#9a6324','#469990','#fabed4','#800000','#808000','#000075','#dcbeff','#aaffc3','#ffd8b1','#fffac8'];
+const CAT_OTHER = '#a8a29a', CAT_NONE_COLOR = '#7f7466';   // «Otros» del gráfico; sin clasificar
 const catColorMap = {};
 function assignCatColors(list){
   const counts = {};
   for (const m of list) if (m.cat!==CAT_NONE) counts[m.cat] = (counts[m.cat]||0)+1;
-  Object.keys(counts).sort((a,b)=>counts[b]-counts[a]).slice(0, CAT_PALETTE.length)
-    .forEach((c,i)=>{ catColorMap[c] = CAT_PALETTE[i]; });
+  Object.keys(counts).sort((a,b)=>counts[b]-counts[a] || a.localeCompare(b,'es')).forEach(catColor);
 }
 function catColor(cat){
   if (cat===CAT_NONE) return CAT_NONE_COLOR;
-  return catColorMap[cat] || CAT_OTHER;
+  // Un tipo que aparece después toma el siguiente color libre.
+  return catColorMap[cat] ||= CAT_PALETTE[Object.keys(catColorMap).length % CAT_PALETTE.length];
+}
+// Sobre los colores claros (amarillo, lima, pasteles) el ícono va oscuro para que se vea.
+function esClaro(hex){
+  const [r,g,b] = [1,3,5].map(i=>parseInt(hex.slice(i,i+2),16));
+  return 0.299*r + 0.587*g + 0.114*b > 170;
 }
 function museumCategory(tags){
   const m = (tags.museum||'').split(';')[0].toLowerCase().trim();
@@ -787,15 +805,16 @@ const cluster = L.markerClusterGroup({
 });
 map.addLayer(cluster);
 
-const MUSEO_SVG = '<svg viewBox="0 0 24 24" width="13" height="13" fill="#fff" aria-hidden="true"><path d="M12 3 3 7.5V9h18V7.5L12 3zM5 10v7h2.5v-7H5zm5.75 0v7h2.5v-7h-2.5zM16.5 10v7H19v-7h-2.5zM3 18.5V21h18v-2.5H3z"/></svg>';
+const MUSEO_SVG = '<svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" aria-hidden="true"><path d="M12 3 3 7.5V9h18V7.5L12 3zM5 10v7h2.5v-7H5zm5.75 0v7h2.5v-7h-2.5zM16.5 10v7H19v-7h-2.5zM3 18.5V21h18v-2.5H3z"/></svg>';
 // estado: 'hl' resaltado (más grande, con halo dorado), 'dim' atenuado, '' normal.
 function museumIcon(cat, isNew, estado){
   const ring = estado==='hl' ? '0 0 0 3px #e8b862, 0 0 14px 4px rgba(232,184,98,.8), '
     : isNew ? '0 0 0 3px #6ea87a, ' : '';
   const s = estado==='hl' ? 30 : 26;
+  const c = catColor(cat), claro = esClaro(c);
   return L.divIcon({
     className:'',
-    html:`<div class="pin" style="width:${s}px;height:${s}px;background:${catColor(cat)};box-shadow:${ring}0 2px 6px rgba(0,0,0,.5)">${MUSEO_SVG}</div>`,
+    html:`<div class="pin" style="width:${s}px;height:${s}px;background:${c};color:${claro?'#1a1208':'#fff'};border-color:${claro?'#3a2c1a':'#fff'};box-shadow:${ring}0 2px 6px rgba(0,0,0,.5)">${MUSEO_SVG}</div>`,
     iconSize:[s,s], iconAnchor:[s/2,s], popupAnchor:[0,-s],
   });
 }
@@ -962,6 +981,7 @@ function renderAll(){
   }
   resActive = -1; resLimit = 50;
   renderResults();
+  renderNearby();
   renderResaltar();
   updateDeptLabels();
   updateDashboard();
@@ -1006,31 +1026,51 @@ function openMuseum(m){
    ============================================================ */
 const sinNombre = m=>m.n==='(sin nombre)' ? 1 : 0;   // al final de la lista
 const noDestacado = m=>resaltar.size && !destacado(m) ? 1 : 0;   // los resaltados, primero
+// Un museo en la lista: borde y punto con el color de su tipo, el tipo escrito y los km si hay ubicación.
+function resItemHtml(m, km, activo){
+  const c = catColor(m.cat);
+  return `
+    <button class="res-item${activo?' active':''}" data-id="${esc(m.i)}" style="--cat:${c}">
+      <span class="cat-dot" style="background:${c}"></span>
+      <span class="res-main">
+        <span class="res-name">${destacado(m)?'<span class="res-star" title="Resaltado">★</span>':''}${esc(m.n)}${newIds.has(m.i)?'<span class="res-new">NUEVO</span>':''}</span>
+        <span class="res-cat">${esc(m.cat)}</span>
+        <span class="res-meta"><span>${m.city ? esc(m.city)+' · ' : ''}${esc(m.d)}</span>${km!=null ? `<span class="res-km">${km.toFixed(1)} km</span>` : ''}</span>
+      </span>
+    </button>`;
+}
+const kmDesde = m=>userLatLng ? haversineKm(userLatLng[0],userLatLng[1],m.a,m.o) : null;
+
 function renderResults(){
-  const visibles = MUSEUMS.filter(passesFilter);
-  resItems = userLatLng
-    ? visibles.map(m=>({m, km:haversineKm(userLatLng[0],userLatLng[1],m.a,m.o)}))
-        .sort((a,b)=>noDestacado(a.m)-noDestacado(b.m) || a.km-b.km)
-    : visibles.map(m=>({m}))
-        .sort((a,b)=>noDestacado(a.m)-noDestacado(b.m) || sinNombre(a.m)-sinNombre(b.m) || a.m.n.localeCompare(b.m.n,'es'));
-  document.getElementById('resCount').textContent =
-    '('+resItems.length.toLocaleString()+')'+(userLatLng ? ' · por cercanía' : '');
+  resItems = MUSEUMS.filter(passesFilter).map(m=>({m, km:kmDesde(m)}))
+    .sort((a,b)=>noDestacado(a.m)-noDestacado(b.m) || sinNombre(a.m)-sinNombre(b.m) || a.m.n.localeCompare(b.m.n,'es'));
+  document.getElementById('resCount').textContent = '('+resItems.length.toLocaleString()+')';
   const wrap = document.getElementById('resList');
   if (!resItems.length){
     wrap.innerHTML = '<div class="res-empty">Ningún museo coincide con la búsqueda y los filtros.</div>';
     return;
   }
   const resto = resItems.length - resLimit;
-  wrap.innerHTML = resItems.slice(0, resLimit).map(({m,km},idx)=>`
-    <button class="res-item${idx===resActive?' active':''}" data-id="${esc(m.i)}">
-      <span class="cat-dot" style="background:${catColor(m.cat)}"></span>
-      <span class="res-main">
-        <span class="res-name">${destacado(m)?'<span class="res-star" title="Resaltado">★</span>':''}${esc(m.n)}${newIds.has(m.i)?'<span class="res-new">NUEVO</span>':''}</span>
-        <span class="res-meta"><span>${m.city ? esc(m.city)+' · ' : ''}${esc(m.d)}</span>${km!=null ? `<span class="res-km">${km.toFixed(1)} km</span>` : ''}</span>
-      </span>
-    </button>`).join('')
+  wrap.innerHTML = resItems.slice(0, resLimit).map(({m,km},idx)=>resItemHtml(m, km, idx===resActive)).join('')
     + (resto>0 ? `<button class="link-btn res-more" id="resMore">Mostrar ${Math.min(50, resto)} más (quedan ${resto})</button>` : '');
 }
+
+// Los 8 museos más cercanos a la ubicación (respetando búsqueda y filtros), con sus km.
+function renderNearby(){
+  const wrap = document.getElementById('nearbyWrap');
+  wrap.hidden = !userLatLng;
+  if (!userLatLng) return;
+  const cerca = MUSEUMS.filter(passesFilter).map(m=>({m, km:kmDesde(m)})).sort((a,b)=>a.km-b.km).slice(0, 8);
+  document.getElementById('nearbyList').innerHTML = cerca.length
+    ? cerca.map(({m,km})=>resItemHtml(m, km, false)).join('')
+    : '<div class="res-empty">Ningún museo coincide con la búsqueda y los filtros.</div>';
+}
+// Tocar un museo cercano calcula la ruta hasta él.
+document.getElementById('nearbyList').addEventListener('click', e=>{
+  const it = e.target.closest('.res-item');
+  const m = it && MUSEUMS.find(x=>x.i===it.dataset.id);
+  if (m){ closeSidebarMobile(); routeTo(m); }
+});
 document.getElementById('resList').addEventListener('click', e=>{
   if (e.target.closest('#resMore')){ resLimit += 50; renderResults(); return; }
   const it = e.target.closest('.res-item');
@@ -1086,8 +1126,6 @@ function buildPopup(m, isNew){
   ].join('');
 
   const osmUrl = `https://www.openstreetmap.org/${m.osmType}/${m.rawId}`;
-  // En el celular abre la app de Google Maps con la ruta desde donde está la persona.
-  const gmaps = `https://www.google.com/maps/dir/?api=1&destination=${m.a},${m.o}`;
   const initialImg = m.image ? commonsFilePathFromTag(m.image) : null;
 
   return `
@@ -1101,8 +1139,7 @@ function buildPopup(m, isNew){
       ${rows}${masInfo}
       ${social?`<div class="pop-btns">${social}</div>`:''}
       <div class="pop-btns">
-        <a class="pop-btn primary" href="${gmaps}" target="_blank" rel="noopener">🧭 Google Maps</a>
-        <button class="pop-btn" onclick="window.__routeTo('${m.i}')">📍 Ruta aquí</button>
+        <button class="pop-btn primary" onclick="window.__routeTo('${m.i}')">📍 Cómo llegar</button>
         <button class="pop-btn" onclick="window.__share('${m.i}')">🔗 Compartir</button>
         <a class="pop-btn" href="${osmUrl}" target="_blank" rel="noopener">Ver en OSM ↗</a>
       </div>
@@ -1471,8 +1508,9 @@ function locate(then){
     userLatLng = [pos.coords.latitude, pos.coords.longitude];
     if (userMarker) map.removeLayer(userMarker);
     userMarker = L.marker(userLatLng,{icon:userIcon, zIndexOffset:1000}).addTo(map).bindPopup('Tu ubicación');
-    st.textContent = '✓ La lista está ordenada por cercanía';
+    st.textContent = '✓ Ubicación obtenida';
     renderResults();
+    renderNearby();
     if (then) then();
     else map.setView(userLatLng, 12);
   }, err=>{
@@ -1487,32 +1525,63 @@ window.__routeTo = function(id){
   if (m) routeTo(m);
 };
 
+// Buscador de ruta: escribir (o elegir de la lista) el museo y «Calcular ruta».
+function rebuildMuseumDatalist(){
+  document.getElementById('museumDatalist').innerHTML = MUSEUMS
+    .filter(m=>!sinNombre(m)).sort((a,b)=>a.n.localeCompare(b.n,'es'))
+    .map(m=>`<option value="${esc(m.n)} — ${esc(m.d)}"></option>`).join('');
+}
+function findMuseumByLabel(label){
+  const [nombre, depto] = label.split('—').map(s=>fold(s.trim()));
+  const candidatos = MUSEUMS.filter(m=>!depto || fold(m.d)===depto);
+  return candidatos.find(m=>fold(m.n)===nombre) || candidatos.find(m=>fold(m.n).includes(nombre));
+}
+function calcularRutaDesdeInput(){
+  const val = document.getElementById('routeInput').value.trim();
+  if (!val){ showToast('Escribe el nombre de un museo','error'); return; }
+  const m = findMuseumByLabel(val);
+  if (!m){ showToast('No se encontró ese museo en los datos cargados','error'); return; }
+  closeSidebarMobile();
+  routeTo(m);
+}
+document.getElementById('btnRoute').addEventListener('click', calcularRutaDesdeInput);
+document.getElementById('routeInput').addEventListener('keydown', e=>{ if (e.key==='Enter') calcularRutaDesdeInput(); });
+
+function quitarRuta(){
+  if (routingControl){ map.removeControl(routingControl); routingControl = null; }
+  document.getElementById('routeResult').classList.remove('show');
+}
+window.__quitarRuta = quitarRuta;
+
+const minTxt = min=>min<60 ? `~${min} min` : `~${Math.floor(min/60)} h ${min%60} min`;
 function routeTo(m){
   if (!userLatLng){ locate(()=>routeTo(m)); return; }   // pide la ubicación y sigue
   closeSheet();
+  map.closePopup();
   const km = haversineKm(userLatLng[0],userLatLng[1], m.a, m.o);
   const box = document.getElementById('routeResult');
   box.classList.add('show');
-  box.innerHTML = `<div class="rr-title">${esc(m.n)}</div>
-    <div>Distancia en línea recta: <b>${km.toFixed(1)} km</b></div>
-    <div id="routeStatus" style="margin-top:4px;color:var(--text-faint)">Calculando ruta por calle…</div>`;
+  box.innerHTML = `<div class="rr-title"><span class="cat-dot" style="display:inline-block;margin-right:6px;background:${catColor(m.cat)}"></span>${esc(m.n)}</div>
+    <div class="rr-line"><span>En línea recta</span><b>${km.toFixed(1)} km</b></div>
+    <div id="routeStatus" style="margin-top:4px;color:var(--text-faint)">Calculando ruta por calle…</div>
+    <button class="link-btn" onclick="window.__quitarRuta()">✕ Quitar ruta</button>`;
 
   if (routingControl){ map.removeControl(routingControl); routingControl=null; }
 
-  let settled = false;
+  let settled = false, ctl = null;
   const sinRuta = ()=>{
     const st = document.getElementById('routeStatus');
-    if (st) st.textContent = 'Ruta por calle no disponible — se muestra distancia directa.';
+    if (st) st.textContent = 'Ruta por calle no disponible; se muestra la distancia en línea recta.';
     showToast(`📏 ${km.toFixed(1)} km en línea recta hasta ${m.n}`);
   };
   const fallbackTimer = setTimeout(()=>{
-    if (settled) return;
+    if (settled || ctl!==routingControl) return;
     settled = true;
     sinRuta();
   }, 9000);
 
   try{
-    routingControl = L.Routing.control({
+    ctl = routingControl = L.Routing.control({
       waypoints:[L.latLng(userLatLng[0],userLatLng[1]), L.latLng(m.a,m.o)],
       routeWhileDragging:false, addWaypoints:false, draggableWaypoints:false,
       show:false, fitSelectedRoutes:true,
@@ -1520,18 +1589,23 @@ function routeTo(m){
       lineOptions:{styles:[{color:'#e8b862', weight:4, opacity:.85}]},
     }).addTo(map);
 
-    routingControl.on('routesfound', e=>{
-      if (settled) return;
+    // Si mientras tanto se pidió otra ruta, la respuesta vieja no pisa la nueva.
+    ctl.on('routesfound', e=>{
+      if (settled || ctl!==routingControl) return;
       settled = true; clearTimeout(fallbackTimer);
       const r = e.routes[0];
-      const kmRoute = (r.summary.totalDistance/1000).toFixed(1);
-      const minutes = Math.round(r.summary.totalTime/60);
+      const kmRuta = r.summary.totalDistance/1000;
+      const enAuto = Math.max(1, Math.round(r.summary.totalTime/60));
+      const aPie = Math.round(kmRuta/4.5*60);   // 4,5 km/h
       const st = document.getElementById('routeStatus');
-      if (st) st.innerHTML = `Ruta por calle: <b>${kmRoute} km</b> · ~${minutes} min en auto`;
-      showToast(`🚗 ${kmRoute} km · ~${minutes} min en auto hasta ${m.n}`,'success');
+      if (st) st.outerHTML = `
+        <div class="rr-line"><span>Por calle</span><b>${kmRuta.toFixed(1)} km</b></div>
+        <div class="rr-line"><span>En auto</span><b>${minTxt(enAuto)}</b></div>
+        ${kmRuta<=15 ? `<div class="rr-line"><span>A pie</span><b>${minTxt(aPie)}</b></div>` : ''}`;
+      showToast(`🚗 ${kmRuta.toFixed(1)} km · ${minTxt(enAuto)} en auto hasta ${m.n}`,'success');
     });
-    routingControl.on('routingerror', ()=>{
-      if (settled) return;
+    ctl.on('routingerror', ()=>{
+      if (settled || ctl!==routingControl) return;
       settled = true; clearTimeout(fallbackTimer);
       sinRuta();
     });
@@ -1668,6 +1742,7 @@ async function loadMuseums(initial, manual){
       assignCatColors(list);
       MUSEUMS = list;
       rebuildCategoryList();
+      rebuildMuseumDatalist();
       renderAll();
       document.getElementById('loadingOverlay').classList.add('hidden');
       applyHash();
@@ -1680,6 +1755,7 @@ async function loadMuseums(initial, manual){
       } else {
         const reabrir = openId;   // renderAll cierra el popup abierto
         rebuildCategoryList();
+        rebuildMuseumDatalist();
         renderAll();
         const m = reabrir && MUSEUMS.find(x=>x.i===reabrir);
         if (sheetOpen){ if (m) showSheet(m); else closeSheet(); }
