@@ -96,18 +96,18 @@ select:focus{outline:1px solid var(--gold-bright)}
 .btn:disabled{opacity:.4; cursor:not-allowed}
 .btn-sm{padding:5px 11px; font-size:.78rem; border-radius:5px}
 
-/* ---------- status bar ---------- */
-#statusBar{
-  display:flex; align-items:center; gap:10px; padding:0 18px; height:36px; background:var(--bg);
-  border-bottom:1px solid var(--line-soft); font-size:.78rem; color:var(--text-faint); flex-shrink:0;
+/* ---------- estado en vivo (discreto, en la cabecera) ---------- */
+.live-pill{
+  display:inline-flex; align-items:center; gap:7px; height:30px; padding:0 12px; cursor:pointer;
+  background:transparent; border:1px solid var(--line-soft); border-radius:999px;
+  color:var(--text-faint); font:500 .78rem 'IBM Plex Sans'; transition:border-color .15s, color .15s;
 }
-#statusText{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.live-pill:hover{border-color:var(--line); color:var(--text-dim)}
 .dot{width:8px;height:8px;border-radius:50%;background:var(--text-faint);flex-shrink:0;transition:background .3s}
 .dot.loading{background:var(--gold);animation:pulse 1s infinite}
 .dot.ok{background:var(--ok)}
 .dot.error{background:var(--error)}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
-#countBadge{flex-shrink:0; background:var(--bg3); border:1px solid var(--line); border-radius:999px; padding:2px 11px; font-size:.75rem; color:var(--text-dim)}
 
 /* ---------- main views ---------- */
 .view{flex:1; position:relative; min-height:0; display:none}
@@ -194,7 +194,38 @@ details.side-block[open] > summary h3{margin-bottom:9px}
   display:flex; align-items:center; justify-content:center; border-radius:50%;
   background:rgba(22,16,9,.9); border:2px solid var(--gold); color:var(--gold-bright);
   font:600 .8rem 'IBM Plex Mono'; box-shadow:0 0 0 4px rgba(207,154,68,.25), 0 3px 10px rgba(0,0,0,.45);
+  position:relative;
 }
+/* grupos mientras se resalta: con museos resaltados brillan y llevan ★k; sin ninguno, se apagan */
+.mc.mc-hl{border-color:#f3d08c; box-shadow:0 0 0 4px rgba(232,184,98,.45), 0 0 16px 4px rgba(232,184,98,.55)}
+.mc.mc-dim{opacity:.4}
+.mc-k{
+  position:absolute; top:-9px; right:-13px; background:#e8b862; color:#1a1208;
+  font:700 .66rem 'IBM Plex Sans'; padding:1px 5px; border-radius:999px; box-shadow:0 1px 4px rgba(0,0,0,.5);
+}
+
+/* ---------- botón «Resaltar» con su lista de casillas ---------- */
+.hl-ctl{position:relative}
+.hl-btn{
+  display:flex; align-items:center; gap:6px; height:36px; padding:0 12px; white-space:nowrap;
+  background:var(--panel); color:var(--text); border:1px solid var(--line); border-radius:8px;
+  font:600 .84rem 'IBM Plex Sans'; cursor:pointer; box-shadow:0 4px 12px rgba(0,0,0,.35);
+}
+.hl-btn:hover{border-color:var(--gold-bright)}
+.hl-btn.on{background:var(--gold); color:#1a1208; border-color:var(--gold-bright)}
+.hl-panel{
+  position:absolute; right:0; top:42px; width:262px; background:var(--panel); color:var(--text);
+  border:1px solid var(--line); border-radius:10px; padding:12px; box-shadow:0 12px 30px rgba(0,0,0,.55);
+}
+.hl-panel[hidden]{display:none}
+.hl-title{font:600 .72rem 'IBM Plex Sans'; text-transform:uppercase; letter-spacing:.08em; color:var(--gold-bright); margin-bottom:6px}
+.hl-row{display:flex; align-items:center; gap:9px; padding:6px 5px; border-radius:6px; cursor:pointer; font-size:.85rem; color:var(--text-dim)}
+.hl-row:hover{background:var(--bg3)}
+.hl-row input{accent-color:var(--gold); width:16px; height:16px; flex-shrink:0; margin:0}
+.hl-row .hl-n{margin-left:auto; font:500 .74rem 'IBM Plex Mono'; color:var(--text-faint)}
+.hl-solo{border-top:1px solid var(--line-soft); margin-top:6px; padding-top:10px; border-radius:0}
+.hl-foot{display:flex; justify-content:space-between; align-items:center; gap:10px; margin-top:8px; font-size:.78rem; color:var(--text-faint)}
+.res-star{color:var(--gold-bright); margin-right:4px}
 
 /* ---------- popups / ficha ---------- */
 .leaflet-popup-content-wrapper{background:var(--panel)!important; color:var(--text)!important; border:1px solid var(--line)!important; border-radius:10px!important; box-shadow:0 12px 30px rgba(0,0,0,.55)!important; padding:0!important; overflow:hidden}
@@ -309,18 +340,22 @@ details.side-block[open] > summary h3{margin-bottom:9px}
 .stat-card{background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:16px 18px}
 .stat-card .sc-num{font-family:'Fraunces'; font-size:1.9rem; font-weight:600; color:var(--gold-bright); line-height:1}
 .stat-card .sc-label{font-size:.8rem; color:var(--text-faint); margin-top:6px}
-.chart-grid{display:grid; grid-template-columns:1fr 1fr; gap:16px}
-@media(max-width:900px){.chart-grid{grid-template-columns:1fr}}
-.chart-card{background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:16px 18px}
-.chart-card h3{font-size:.92rem; font-weight:600; color:var(--text); margin-bottom:4px; font-family:'IBM Plex Sans'}
-.chart-card p{font-size:.76rem; color:var(--text-faint); margin-bottom:10px}
-.chart-card canvas{max-height:340px}
-.table-card{background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:16px 18px; overflow-x:auto}
+.stat-card .sc-sub{font-size:.74rem; color:var(--text-faint); margin-top:3px; opacity:.8}
+.dash-row{display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.15fr); gap:16px; align-items:start}
+@media(max-width:1000px){.dash-row{grid-template-columns:1fr}}
+.chart-card, .table-card{background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:16px 18px}
+.chart-card h3, .table-card h3{font-size:.92rem; font-weight:600; color:var(--text); margin-bottom:4px; font-family:'IBM Plex Sans'}
+.chart-card p, .table-card p{font-size:.76rem; color:var(--text-faint); margin-bottom:10px}
+.chart-box{position:relative}
+.table-card{overflow-x:auto}
 table.simple{width:100%; border-collapse:collapse; font-size:.84rem}
-table.simple th{text-align:left; color:var(--text-faint); font-weight:600; font-size:.72rem; text-transform:uppercase; letter-spacing:.04em; padding:6px 10px; border-bottom:1px solid var(--line)}
-table.simple td{padding:8px 10px; border-bottom:1px solid var(--line-soft); color:var(--text-dim)}
+table.simple th{text-align:left; color:var(--text-faint); font-weight:600; font-size:.7rem; text-transform:uppercase; letter-spacing:.04em; padding:6px 9px; border-bottom:1px solid var(--line); white-space:nowrap}
+table.simple td{padding:7px 9px; border-bottom:1px solid var(--line-soft); color:var(--text-dim)}
+table.simple .n{text-align:right; font-variant-numeric:tabular-nums}
+table.simple td .cat-dot{display:inline-block; margin-right:7px; vertical-align:middle}
 table.simple tbody tr{cursor:pointer}
 table.simple tbody tr:hover td{color:var(--text); background:var(--bg3)}
+table.simple tfoot td{font-weight:600; color:var(--text); border-top:1px solid var(--line); border-bottom:none}
 
 @media(hover:none){.hint, #btnHelp{display:none!important}}
 @media(max-width:760px){
@@ -329,7 +364,7 @@ table.simple tbody tr:hover td{color:var(--text); background:var(--bg3)}
   .brand h1{font-size:1.02rem}
   .brand small, .brand-ico{display:none}
   .tab-btn{padding:6px 10px; font-size:.8rem}
-  #statusBar{padding:0 12px; font-size:.74rem}
+  .live-pill{display:none}
   #sidebar{position:absolute; left:-320px; top:0; bottom:0; width:300px; max-width:88vw; z-index:1100; transition:left .2s; box-shadow:8px 0 24px rgba(0,0,0,.45)}
   #sidebar.open{left:0}
   #sidebarToggle{display:inline-flex!important}
@@ -355,16 +390,11 @@ table.simple tbody tr:hover td{color:var(--text); background:var(--bg3)}
     <button class="tab-btn" data-view="dashboardView">Estadísticas</button>
   </div>
   <div class="hdr-right">
+    <!-- Las actualizaciones van por detrás; aquí solo un aviso discreto (detalle al pasar el mouse). -->
+    <button class="live-pill" id="livePill" title="Cargando museos…"><span class="dot loading" id="statusDot"></span><span id="statusText">Cargando…</span></button>
     <button class="icon-btn" id="btnHelp" title="Atajos de teclado (?)" aria-label="Atajos de teclado">⌨</button>
   </div>
 </header>
-
-<div id="statusBar">
-  <div class="dot" id="statusDot"></div>
-  <span id="statusText">Cargando museos desde OpenStreetMap…</span>
-  <span id="countBadge">0 museos</span>
-  <button class="icon-btn sm" id="btnRefreshNow" title="Buscar cambios ahora (R)" aria-label="Buscar cambios ahora">↻</button>
-</div>
 
 <!-- ================= MAPA ================= -->
 <div class="view active" id="mapView">
@@ -422,36 +452,50 @@ table.simple tbody tr:hover td{color:var(--text); background:var(--bg3)}
 <div class="view" id="dashboardView">
   <div class="dash-title">
     <h2>Estadísticas — Museos de Bolivia</h2>
-    <span id="dashUpdated"></span>
+    <span>Datos en vivo de OpenStreetMap, Wikidata y Wikipedia</span>
   </div>
 
   <div class="stat-grid">
-    <div class="stat-card"><div class="sc-num" id="statTotalMuseums">0</div><div class="sc-label">Museos georreferenciados</div></div>
-    <div class="stat-card"><div class="sc-num" id="statWithWikidata">0</div><div class="sc-label">Con ficha Wikidata</div></div>
-    <div class="stat-card"><div class="sc-num" id="statWithWebsite">0</div><div class="sc-label">Con sitio web</div></div>
-    <div class="stat-card"><div class="sc-num" id="statCategories">0</div><div class="sc-label">Tipos de museo</div></div>
-    <div class="stat-card"><div class="sc-num" id="statDepts">9</div><div class="sc-label">Departamentos cubiertos</div></div>
+    <div class="stat-card"><div class="sc-num" id="statTotalMuseums">0</div><div class="sc-label">Museos en el mapa</div></div>
+    <div class="stat-card"><div class="sc-num" id="statCategories">0</div><div class="sc-label">Tipos de museo</div><div class="sc-sub" id="statSinTipo"></div></div>
+    <div class="stat-card"><div class="sc-num" id="statWithArticle">0</div><div class="sc-label">Con artículo en Wikipedia</div><div class="sc-sub" id="pctArticle"></div></div>
+    <div class="stat-card"><div class="sc-num" id="statWithWikidata">0</div><div class="sc-label">Con ficha en Wikidata</div><div class="sc-sub" id="pctWikidata"></div></div>
+    <div class="stat-card"><div class="sc-num" id="statWithWebsite">0</div><div class="sc-label">Con sitio web</div><div class="sc-sub" id="pctWebsite"></div></div>
+    <div class="stat-card"><div class="sc-num" id="statDepts">9</div><div class="sc-label">Departamentos</div></div>
   </div>
 
-  <div class="chart-grid">
+  <!-- Cada gráfico con su tabla al lado: la tabla se ve completa sin bajar hasta el final. -->
+  <div class="dash-row">
     <div class="chart-card">
       <h3>Museos por departamento</h3>
-      <p>Haz clic en una barra para ver ese departamento en el mapa.</p>
-      <canvas id="chartDept"></canvas>
+      <p>Haz clic en una barra o en una fila para verlo en el mapa.</p>
+      <div class="chart-box" style="height:310px"><canvas id="chartDept"></canvas></div>
     </div>
+    <div class="table-card">
+      <h3>Resumen por departamento</h3>
+      <p>Cuántos museos de cada departamento tienen cada dato.</p>
+      <table class="simple" id="deptTable">
+        <thead><tr><th>Departamento</th><th class="n">Museos</th><th class="n">Tipos</th><th class="n">Wikipedia</th><th class="n">Wikidata</th><th class="n">Sitio web</th><th class="n">Horario</th></tr></thead>
+        <tbody></tbody>
+        <tfoot></tfoot>
+      </table>
+    </div>
+  </div>
+
+  <div class="dash-row">
     <div class="chart-card">
       <h3>Museos por tipo</h3>
       <p>Según la etiqueta museum=* de OpenStreetMap.</p>
-      <canvas id="chartCat"></canvas>
+      <div class="chart-box" style="height:400px"><canvas id="chartCat"></canvas></div>
     </div>
-  </div>
-
-  <div class="table-card">
-    <h3 style="margin-bottom:10px">Detalle por departamento</h3>
-    <table class="simple" id="deptTable">
-      <thead><tr><th>Departamento</th><th>Museos</th><th>Con Wikidata</th><th>Con sitio web</th><th>Con horario</th></tr></thead>
-      <tbody></tbody>
-    </table>
+    <div class="table-card">
+      <h3>Resumen por tipo de museo</h3>
+      <p>Haz clic en un tipo para ver solo esos museos en el mapa.</p>
+      <table class="simple" id="catTable">
+        <thead><tr><th>Tipo</th><th class="n">Museos</th><th class="n">%</th><th class="n">Wikipedia</th><th class="n">Wikidata</th><th class="n">Deptos.</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
   </div>
 </div>
 
@@ -473,6 +517,8 @@ table.simple tbody tr:hover td{color:var(--text); background:var(--bg3)}
       <span><kbd>M</kbd> / <kbd>E</kbd></span><span>Mapa / Estadísticas</span>
       <span><kbd>U</kbd></span><span>Usar mi ubicación</span>
       <span><kbd>R</kbd></span><span>Buscar cambios en OSM ahora</span>
+      <span><kbd>H</kbd></span><span>Abrir «Resaltar» (lista de casillas)</span>
+      <span><kbd>W</kbd></span><span>Resaltar los que tienen artículo en Wikipedia</span>
       <span><kbd>F</kbd></span><span>Pantalla completa</span>
       <span><kbd>?</kbd></span><span>Mostrar esta ayuda</span>
     </div>
@@ -564,6 +610,9 @@ let routingControl = null;
 const wikiCache = new Map();
 let chartDept=null, chartCat=null;
 let resItems = [], resLimit = 50, resActive = -1;
+let resaltar = new Set();       // casillas marcadas en «Resaltar»
+let soloResaltados = false;
+const wdArticulo = new Map();   // QID → {lang, title} del artículo en Wikipedia, o null
 const mqMobile = matchMedia('(max-width:760px)');
 const touch = matchMedia('(pointer:coarse)').matches;
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -672,6 +721,7 @@ function updateDeptLabels(){
   for (const m of MUSEUMS){
     if (hiddenCats.has(m.cat)) continue;
     if (searchText && !m.q.includes(searchText)) continue;
+    if (soloResaltados && resaltar.size && !destacado(m)) continue;
     counts[m.d] = (counts[m.d]||0)+1;
   }
   for (const [d, mk] of Object.entries(deptLabels)){
@@ -702,23 +752,51 @@ L.control.layers({
   'Sombrear fuera de Bolivia': mascara,
 }, {position:'topright', collapsed:true}).addTo(map);
 
+// Botón «Resaltar»: lista de casillas; se iluminan los museos que cumplen todo lo marcado.
+const ResaltarCtl = L.Control.extend({
+  options:{position:'topright'},
+  onAdd(){
+    const div = L.DomUtil.create('div', 'leaflet-control hl-ctl');
+    div.innerHTML = `
+      <button class="hl-btn" id="hlBtn" aria-expanded="false" aria-controls="hlPanel" title="Resaltar museos (H)">★ Resaltar</button>
+      <div class="hl-panel" id="hlPanel" hidden>
+        <div class="hl-title">Resaltar museos con…</div>
+        <div id="hlList"></div>
+        <label class="hl-row hl-solo"><input type="checkbox" id="hlSolo"/> Mostrar solo los resaltados</label>
+        <div class="hl-foot"><span id="hlCount"></span><button class="link-btn" id="hlClear">Quitar todo</button></div>
+      </div>`;
+    L.DomEvent.disableClickPropagation(div);
+    L.DomEvent.disableScrollPropagation(div);
+    return div;
+  },
+});
+new ResaltarCtl().addTo(map);
+
 const cluster = L.markerClusterGroup({
   chunkedLoading:true, maxClusterRadius:45, spiderfyOnMaxZoom:true, showCoverageOnHover:false,
   iconCreateFunction: c=>{
     const n = c.getChildCount(), s = n<10 ? 32 : n<50 ? 38 : 46;
+    let cls = 'mc', k = 0;
+    if (resaltar.size){
+      k = c.getAllChildMarkers().filter(mk=>mk.options.hl).length;
+      cls += k ? ' mc-hl' : ' mc-dim';
+    }
     return L.divIcon({className:'', iconSize:[s,s],
-      html:`<div class="mc" style="width:${s}px;height:${s}px">${n}</div>`});
+      html:`<div class="${cls}" style="width:${s}px;height:${s}px">${n}${k ? `<span class="mc-k">★${k}</span>` : ''}</div>`});
   },
 });
 map.addLayer(cluster);
 
 const MUSEO_SVG = '<svg viewBox="0 0 24 24" width="13" height="13" fill="#fff" aria-hidden="true"><path d="M12 3 3 7.5V9h18V7.5L12 3zM5 10v7h2.5v-7H5zm5.75 0v7h2.5v-7h-2.5zM16.5 10v7H19v-7h-2.5zM3 18.5V21h18v-2.5H3z"/></svg>';
-function museumIcon(cat, isNew){
-  const ring = isNew ? '0 0 0 3px #6ea87a, ' : '';
+// estado: 'hl' resaltado (más grande, con halo dorado), 'dim' atenuado, '' normal.
+function museumIcon(cat, isNew, estado){
+  const ring = estado==='hl' ? '0 0 0 3px #e8b862, 0 0 14px 4px rgba(232,184,98,.8), '
+    : isNew ? '0 0 0 3px #6ea87a, ' : '';
+  const s = estado==='hl' ? 30 : 26;
   return L.divIcon({
     className:'',
-    html:`<div class="pin" style="background:${catColor(cat)};box-shadow:${ring}0 2px 6px rgba(0,0,0,.5)">${MUSEO_SVG}</div>`,
-    iconSize:[26,26], iconAnchor:[13,26], popupAnchor:[0,-26],
+    html:`<div class="pin" style="width:${s}px;height:${s}px;background:${catColor(cat)};box-shadow:${ring}0 2px 6px rgba(0,0,0,.5)">${MUSEO_SVG}</div>`,
+    iconSize:[s,s], iconAnchor:[s/2,s], popupAnchor:[0,-s],
   });
 }
 const userIcon = L.divIcon({
@@ -773,13 +851,89 @@ function featureToMuseum(f){
 }
 
 /* ============================================================
+   RESALTAR — qué tiene cada museo
+   ============================================================ */
+// Artículo en Wikipedia: la etiqueta wikipedia de OSM ("es:Título"), o el enlace que tenga
+// su ficha de Wikidata (cargarArticulos).
+function articulo(m){
+  if (m.wikipedia){
+    const mt = m.wikipedia.match(/^([a-z-]{2,12}):(.+)$/);
+    return mt ? {lang:mt[1], title:mt[2].trim()} : {lang:'es', title:m.wikipedia.trim()};
+  }
+  return (m.wikidata && wdArticulo.get(m.wikidata)) || null;
+}
+const RESALTES = [
+  {id:'wp',   icon:'📖', label:'Artículo en Wikipedia', test:m=>!!articulo(m)},
+  {id:'wd',   icon:'🗂', label:'Ficha en Wikidata',     test:m=>!!m.wikidata},
+  {id:'web',  icon:'🌐', label:'Sitio web o redes',     test:m=>!!(m.website||m.facebook||m.instagram||m.tiktok||m.youtube)},
+  {id:'oh',   icon:'🕒', label:'Horario',               test:m=>!!m.hours},
+  {id:'desc', icon:'📝', label:'Descripción',           test:m=>!!m.desc},
+  {id:'tel',  icon:'📞', label:'Teléfono',              test:m=>!!m.phone},
+];
+const destacado = m=>resaltar.size>0 && RESALTES.every(r=>!resaltar.has(r.id) || r.test(m));
+
+// Una sola consulta a Wikidata (50 fichas por pedido) para saber qué museos tienen artículo.
+async function cargarArticulos(){
+  const faltan = [...new Set(MUSEUMS.map(m=>m.wikidata).filter(q=>/^Q\d+$/.test(q) && !wdArticulo.has(q)))];
+  for (let i=0; i<faltan.length; i+=50){
+    const ids = faltan.slice(i, i+50);
+    try{
+      const r = await fetch(`https://www.wikidata.org/w/api.php?action=wbgetentities&ids=${ids.join('|')}&props=sitelinks&sitefilter=eswiki|enwiki&format=json&origin=*`);
+      const j = await r.json();
+      for (const id of ids){
+        const sl = j.entities?.[id]?.sitelinks || {};
+        wdArticulo.set(id, sl.eswiki ? {lang:'es', title:sl.eswiki.title} : sl.enwiki ? {lang:'en', title:sl.enwiki.title} : null);
+      }
+    }catch(e){ /* sin Wikidata quedan solo los artículos de la etiqueta de OSM */ }
+  }
+  if (resaltar.has('wp')) renderAll(); else renderResaltar();
+  updateDashboard();
+}
+
+function renderResaltar(){
+  const base = MUSEUMS.filter(m=>currentDept==='all' || m.d===currentDept);
+  document.getElementById('hlList').innerHTML = RESALTES.map(r=>`
+    <label class="hl-row"><input type="checkbox" data-hl="${r.id}" ${resaltar.has(r.id)?'checked':''}/>
+      <span>${r.icon} ${r.label}</span><span class="hl-n">${base.filter(r.test).length}</span></label>`).join('');
+  const n = resaltar.size ? MUSEUMS.filter(m=>passesBase(m) && destacado(m)).length : 0;
+  document.getElementById('hlCount').textContent = !resaltar.size ? 'Marca una o más casillas'
+    : n===1 ? '1 museo cumple todo' : n+' museos cumplen todo';
+  document.getElementById('hlSolo').checked = soloResaltados;
+  const btn = document.getElementById('hlBtn');
+  btn.classList.toggle('on', resaltar.size>0);
+  btn.textContent = resaltar.size ? '★ Resaltar · '+n : '★ Resaltar';
+}
+function toggleResaltarPanel(show){
+  const p = document.getElementById('hlPanel');
+  show = show ?? p.hidden;
+  p.hidden = !show;
+  document.getElementById('hlBtn').setAttribute('aria-expanded', show);
+  return true;
+}
+function toggleResalte(id){
+  if (resaltar.has(id)) resaltar.delete(id); else resaltar.add(id);
+  if (!resaltar.size) soloResaltados = false;
+  renderAll();
+}
+document.getElementById('hlBtn').addEventListener('click', ()=>toggleResaltarPanel());
+document.getElementById('hlList').addEventListener('change', e=>{
+  const id = e.target.dataset.hl;
+  if (id) toggleResalte(id);
+});
+document.getElementById('hlSolo').addEventListener('change', e=>{ soloResaltados = e.target.checked; renderAll(); });
+document.getElementById('hlClear').addEventListener('click', ()=>{ resaltar.clear(); soloResaltados = false; renderAll(); });
+
+/* ============================================================
    RENDERIZADO DE MARCADORES
    ============================================================ */
-function passesFilter(m){
+function passesBase(m){
   if (currentDept!=='all' && m.d!==currentDept) return false;
   if (hiddenCats.has(m.cat)) return false;
   if (searchText && !m.q.includes(searchText)) return false;
   return true;
+}
+function passesFilter(m){
+  return passesBase(m) && (!soloResaltados || !resaltar.size || destacado(m));
 }
 
 const popupMaxH = ()=>Math.round(Math.min(540, innerHeight*.62));
@@ -791,7 +945,9 @@ function renderAll(){
   for (const m of MUSEUMS){
     if (!passesFilter(m)) continue;
     const isNew = newIds.has(m.i);
-    const marker = L.marker([m.a,m.o],{icon:museumIcon(m.cat,isNew), title:m.n});
+    const est = !resaltar.size ? '' : destacado(m) ? 'hl' : 'dim';
+    const marker = L.marker([m.a,m.o], {icon:museumIcon(m.cat,isNew,est), title:m.n, hl:est==='hl',
+      opacity: est==='dim' ? .4 : 1, zIndexOffset: est==='hl' ? 500 : 0});
     if (mqMobile.matches){
       // En el celular la ficha sube desde abajo en vez de un popup sobre el mapa.
       marker.on('click', ()=>{ showSheet(m); centrarSobreFicha(m); });
@@ -804,9 +960,9 @@ function renderAll(){
     markerById.set(m.i, marker);
     count++;
   }
-  document.getElementById('countBadge').textContent = count.toLocaleString()+(count===1?' museo':' museos');
   resActive = -1; resLimit = 50;
   renderResults();
+  renderResaltar();
   updateDeptLabels();
   updateDashboard();
 }
@@ -849,11 +1005,14 @@ function openMuseum(m){
    LISTA DE MUSEOS (resultados de la búsqueda y los filtros)
    ============================================================ */
 const sinNombre = m=>m.n==='(sin nombre)' ? 1 : 0;   // al final de la lista
+const noDestacado = m=>resaltar.size && !destacado(m) ? 1 : 0;   // los resaltados, primero
 function renderResults(){
   const visibles = MUSEUMS.filter(passesFilter);
   resItems = userLatLng
-    ? visibles.map(m=>({m, km:haversineKm(userLatLng[0],userLatLng[1],m.a,m.o)})).sort((a,b)=>a.km-b.km)
-    : visibles.map(m=>({m})).sort((a,b)=>sinNombre(a.m)-sinNombre(b.m) || a.m.n.localeCompare(b.m.n,'es'));
+    ? visibles.map(m=>({m, km:haversineKm(userLatLng[0],userLatLng[1],m.a,m.o)}))
+        .sort((a,b)=>noDestacado(a.m)-noDestacado(b.m) || a.km-b.km)
+    : visibles.map(m=>({m}))
+        .sort((a,b)=>noDestacado(a.m)-noDestacado(b.m) || sinNombre(a.m)-sinNombre(b.m) || a.m.n.localeCompare(b.m.n,'es'));
   document.getElementById('resCount').textContent =
     '('+resItems.length.toLocaleString()+')'+(userLatLng ? ' · por cercanía' : '');
   const wrap = document.getElementById('resList');
@@ -866,7 +1025,7 @@ function renderResults(){
     <button class="res-item${idx===resActive?' active':''}" data-id="${esc(m.i)}">
       <span class="cat-dot" style="background:${catColor(m.cat)}"></span>
       <span class="res-main">
-        <span class="res-name">${esc(m.n)}${newIds.has(m.i)?'<span class="res-new">NUEVO</span>':''}</span>
+        <span class="res-name">${destacado(m)?'<span class="res-star" title="Resaltado">★</span>':''}${esc(m.n)}${newIds.has(m.i)?'<span class="res-new">NUEVO</span>':''}</span>
         <span class="res-meta"><span>${m.city ? esc(m.city)+' · ' : ''}${esc(m.d)}</span>${km!=null ? `<span class="res-km">${km.toFixed(1)} km</span>` : ''}</span>
       </span>
     </button>`).join('')
@@ -898,7 +1057,7 @@ function entrada(m){
 const ACCESO = {yes:'♿ Accesible en silla de ruedas', limited:'♿ Acceso parcial', no:'Sin acceso para silla de ruedas'};
 
 function buildPopup(m, isNew){
-  const ent = entrada(m);
+  const ent = entrada(m), art = articulo(m);
   const tel = m.phone.split(';')[0].replace(/[^\d+]/g,'');
   const rows = [
     m.city ? ['Ciudad', esc(m.city)] : null,
@@ -923,6 +1082,7 @@ function buildPopup(m, isNew){
     m.instagram ? `<a class="pop-btn" href="${esc(fullUrl(m.instagram,'instagram'))}" target="_blank" rel="noopener">Instagram</a>` : '',
     m.tiktok ? `<a class="pop-btn" href="${esc(fullUrl(m.tiktok,'tiktok'))}" target="_blank" rel="noopener">TikTok</a>` : '',
     m.youtube ? `<a class="pop-btn" href="${esc(fullUrl(m.youtube))}" target="_blank" rel="noopener">YouTube</a>` : '',
+    art ? `<a class="pop-btn" href="${esc(articuloUrl(art))}" target="_blank" rel="noopener">📖 Wikipedia</a>` : '',
   ].join('');
 
   const osmUrl = `https://www.openstreetmap.org/${m.osmType}/${m.rawId}`;
@@ -946,7 +1106,8 @@ function buildPopup(m, isNew){
         <button class="pop-btn" onclick="window.__share('${m.i}')">🔗 Compartir</button>
         <a class="pop-btn" href="${osmUrl}" target="_blank" rel="noopener">Ver en OSM ↗</a>
       </div>
-      <div class="pop-wiki" id="wiki-${cssId(m.i)}">${m.wikidata ? '<div class="pop-loading">Consultando Wikidata…</div>' : ''}</div>
+      <div class="pop-wiki" id="wiki-${cssId(m.i)}">${m.wikidata ? '<div class="pop-loading">Consultando Wikidata…</div>'
+        : art ? '<div class="pop-loading">Consultando Wikipedia…</div>' : ''}</div>
     </div>`;
 }
 
@@ -1031,10 +1192,25 @@ function commonsFilePathFromTag(tag){
   return 'https://commons.wikimedia.org/wiki/Special:FilePath/'+encodeURIComponent(name)+'?width=500';
 }
 
+const articuloUrl = a=>`https://${a.lang}.wikipedia.org/wiki/${encodeURIComponent(a.title.replace(/ /g,'_'))}`;
+function wikipediaHtml(lang, wp){
+  return `
+    <div class="pop-wiki-label">📖 Wikipedia (${esc(lang.toUpperCase())}) · en vivo</div>
+    <div class="pop-extract">${esc(wp.extract||'')}</div>
+    <div class="pop-btns"><a class="pop-btn" href="${esc(wp.url)}" target="_blank" rel="noopener">Leer artículo ↗</a></div>`;
+}
+
 async function enrichPopup(m){
-  if (!m.wikidata) return;
   const holder = document.getElementById('wiki-'+cssId(m.i));
   if (!holder) return;
+  if (!m.wikidata){
+    // Sin Wikidata pero con la etiqueta wikipedia de OSM: el resumen va directo.
+    const art = articulo(m);
+    if (!art) return;
+    const wp = await fetchWikipediaSummary(art.lang, art.title).catch(()=>null);
+    holder.innerHTML = wp ? wikipediaHtml(art.lang, wp) : '';
+    return;
+  }
   try{
     const data = await fetchWikidataBundle(m.wikidata);
     if (!holder) return;
@@ -1049,15 +1225,13 @@ async function enrichPopup(m){
       </div>`;
     holder.innerHTML = html;
 
-    if (data.wikipediaTitle){
-      const wp = await fetchWikipediaSummary('es', data.wikipediaTitle);
+    const art = data.wikipediaTitle ? {lang:'es', title:data.wikipediaTitle} : articulo(m);
+    if (art){
+      const wp = await fetchWikipediaSummary(art.lang, art.title);
       if (wp && holder){
         const extra = document.createElement('div');
         extra.className='pop-wiki';
-        extra.innerHTML = `
-          <div class="pop-wiki-label">📖 Wikipedia (ES) · en vivo</div>
-          <div class="pop-extract">${esc(wp.extract||'')}</div>
-          <div class="pop-btns"><a class="pop-btn" href="${esc(wp.url)}" target="_blank" rel="noopener">Leer artículo ↗</a></div>`;
+        extra.innerHTML = wikipediaHtml(art.lang, wp);
         holder.appendChild(extra);
       }
     }
@@ -1273,7 +1447,7 @@ function closeSidebarMobile(){
   sb.classList.remove('open');
   return true;
 }
-map.on('click', ()=>{ closeSidebarMobile(); closeSheet(); });
+map.on('click', ()=>{ closeSidebarMobile(); closeSheet(); toggleResaltarPanel(false); });
 // Al pasar entre celular y escritorio cambia la forma de la ficha: rehacer marcadores.
 mqMobile.addEventListener('change', ()=>{ closeSheet(); map.closePopup(); renderAll(); });
 
@@ -1372,32 +1546,43 @@ function routeTo(m){
 function updateDashboard(){
   // Solo se dibuja con la pestaña a la vista; switchView lo llama al abrirla.
   if (!document.getElementById('dashboardView').classList.contains('active')) return;
-  const visible = MUSEUMS; // las estadísticas siempre muestran el total cargado
-  document.getElementById('statTotalMuseums').textContent = visible.length.toLocaleString();
-  document.getElementById('statWithWikidata').textContent = visible.filter(m=>m.wikidata).length.toLocaleString();
-  document.getElementById('statWithWebsite').textContent = visible.filter(m=>m.website).length.toLocaleString();
-  document.getElementById('statCategories').textContent = new Set(visible.map(m=>m.cat).filter(c=>c!==CAT_NONE)).size;
-  document.getElementById('dashUpdated').textContent = lastCheck ? 'Revisado '+new Date(lastCheck).toLocaleTimeString('es-BO',{timeZone:'America/La_Paz', timeStyle:'short'}) : '';
+  const all = MUSEUMS; // las estadísticas siempre muestran el total cargado
+  const N = all.length;
+  const set = (id, v)=>{ document.getElementById(id).textContent = v; };
+  const pct = n=>N ? Math.round(n*100/N)+' % del total' : '';
 
-  const byDept = {};
-  for (const d of DEPT_ORDER) byDept[d] = {total:0, wd:0, web:0, oh:0};
-  for (const m of visible){
-    if (!byDept[m.d]) continue;
-    byDept[m.d].total++;
-    if (m.wikidata) byDept[m.d].wd++;
-    if (m.website) byDept[m.d].web++;
-    if (m.hours) byDept[m.d].oh++;
+  // Una fila por departamento y por tipo, con cuántos museos tienen cada dato.
+  const fila = ()=>({total:0, tipos:new Set(), depts:new Set(), wp:0, wd:0, web:0, oh:0});
+  const sumar = (f, m)=>{
+    f.total++; f.tipos.add(m.cat); f.depts.add(m.d);
+    if (articulo(m)) f.wp++;
+    if (m.wikidata) f.wd++;
+    if (m.website) f.web++;
+    if (m.hours) f.oh++;
+  };
+  const byDept = {}, byCat = {}, tot = fila();
+  for (const d of DEPT_ORDER) byDept[d] = fila();
+  for (const m of all){
+    if (byDept[m.d]) sumar(byDept[m.d], m);
+    sumar(byCat[m.cat] = byCat[m.cat] || fila(), m);
+    sumar(tot, m);
   }
+  const tiposDe = f=>[...f.tipos].filter(c=>c!==CAT_NONE).length;
   const deptNames = DEPT_ORDER.filter(d=>byDept[d].total>0).sort((a,b)=>byDept[b].total-byDept[a].total);
-  document.getElementById('statDepts').textContent = deptNames.length;
+  const catLabels = Object.keys(byCat).sort((a,b)=>byCat[b].total-byCat[a].total || a.localeCompare(b,'es'));
 
-  const byCat = {};
-  for (const m of visible) byCat[m.cat]=(byCat[m.cat]||0)+1;
-  const catLabels = Object.keys(byCat).sort((a,b)=>byCat[b]-byCat[a]);
+  set('statTotalMuseums', N.toLocaleString());
+  set('statCategories', tiposDe(tot));
+  set('statSinTipo', byCat[CAT_NONE] ? byCat[CAT_NONE].total+' museos sin clasificar' : '');
+  set('statWithArticle', tot.wp); set('pctArticle', pct(tot.wp));
+  set('statWithWikidata', tot.wd); set('pctWikidata', pct(tot.wd));
+  set('statWithWebsite', tot.web); set('pctWebsite', pct(tot.web));
+  set('statDepts', deptNames.length);
+
   // Con 20 tipos la dona no se leía: barras con los 12 más comunes y el resto en «Otros».
   const top = catLabels.slice(0,12), resto = catLabels.slice(12);
   const catNames = resto.length ? [...top, `Otros (${resto.length} tipos)`] : top;
-  const catData = [...top.map(c=>byCat[c]), ...(resto.length ? [resto.reduce((s,c)=>s+byCat[c],0)] : [])];
+  const catData = [...top.map(c=>byCat[c].total), ...(resto.length ? [resto.reduce((s,c)=>s+byCat[c].total,0)] : [])];
   const catColors = [...top.map(catColor), ...(resto.length ? [CAT_OTHER] : [])];
 
   const ctx1 = document.getElementById('chartDept');
@@ -1413,25 +1598,45 @@ function updateDashboard(){
       type:'bar',
       data:{labels:deptNames, datasets:[{label:'Museos', data:deptNames.map(d=>byDept[d].total),
         backgroundColor:deptNames.map(d=>d===currentDept ? '#e8b862' : '#cf9a44'), borderRadius:4}]},
-      options:{indexAxis:'y', plugins:{legend:{display:false}}, scales:ejes,
+      options:{indexAxis:'y', maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:ejes,
         onClick:(e, els)=>{ if (els.length){ switchView('mapView'); selectDept(deptNames[els[0].index]); } },
         onHover:(e, els)=>{ e.native.target.style.cursor = els.length ? 'pointer' : 'default'; }},
     });
     chartCat = new Chart(ctx2, {
       type:'bar',
       data:{labels:catNames, datasets:[{label:'Museos', data:catData, backgroundColor:catColors, borderRadius:4}]},
-      options:{indexAxis:'y', plugins:{legend:{display:false}}, scales:ejes},
+      options:{indexAxis:'y', maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:ejes},
     });
   }
 
-  const tbody = document.querySelector('#deptTable tbody');
-  tbody.innerHTML = deptNames.map(d=>`
-    <tr data-dept="${esc(d)}" title="Ver ${esc(d)} en el mapa"><td>${esc(d)}</td><td>${byDept[d].total}</td><td>${byDept[d].wd}</td><td>${byDept[d].web}</td><td>${byDept[d].oh}</td></tr>
-  `).join('');
+  const celdas = f=>`<td class="n">${f.total}</td><td class="n">${tiposDe(f)}</td><td class="n">${f.wp}</td><td class="n">${f.wd}</td><td class="n">${f.web}</td><td class="n">${f.oh}</td>`;
+  document.querySelector('#deptTable tbody').innerHTML = deptNames.map(d=>
+    `<tr data-dept="${esc(d)}" title="Ver ${esc(d)} en el mapa"><td>${esc(d)}</td>${celdas(byDept[d])}</tr>`).join('');
+  document.querySelector('#deptTable tfoot').innerHTML = `<tr><td>Bolivia</td>${celdas(tot)}</tr>`;
+  document.querySelector('#catTable tbody').innerHTML = catLabels.map(c=>{
+    const f = byCat[c];
+    return `<tr data-cat="${esc(c)}" title="Ver solo «${esc(c)}» en el mapa">
+      <td><span class="cat-dot" style="background:${catColor(c)}"></span>${esc(c)}</td>
+      <td class="n">${f.total}</td><td class="n">${f.total*100/N < 1 ? '&lt;1' : Math.round(f.total*100/N)} %</td>
+      <td class="n">${f.wp}</td><td class="n">${f.wd}</td><td class="n">${f.depts.size}</td></tr>`;
+  }).join('');
 }
 document.querySelector('#deptTable tbody').addEventListener('click', e=>{
   const tr = e.target.closest('tr[data-dept]');
   if (tr){ switchView('mapView'); selectDept(tr.dataset.dept); }
+});
+document.querySelector('#catTable tbody').addEventListener('click', e=>{
+  const tr = e.target.closest('tr[data-cat]');
+  if (!tr) return;
+  const c = tr.dataset.cat;
+  switchView('mapView');
+  if (currentDept!=='all') selectDept('all');
+  hiddenCats = new Set(MUSEUMS.map(m=>m.cat).filter(x=>x!==c));
+  rebuildCategoryList();
+  renderAll();
+  verBolivia();
+  document.getElementById('catBlock').open = true;
+  showToast(`Mostrando solo «${c}» — «Marcar todos» en Tipo de museo para volver`);
 });
 
 /* ============================================================
@@ -1441,15 +1646,17 @@ function relTime(t){
   const min = Math.floor((Date.now()-t)/60000);
   return min<1 ? 'recién' : 'hace '+min+' min';
 }
+// A la vista solo «● En vivo»; la fecha y la última revisión van en el texto al pasar el mouse.
 function showLive(){
-  setStatus('ok', (liveNote ? liveNote+' — ' : '')+'En vivo · datos del '+dataFecha+' · revisado '+relTime(lastCheck));
+  setStatus('ok', 'En vivo', 'Datos de OpenStreetMap del '+dataFecha+' · revisado '+relTime(lastCheck)
+    +(liveNote ? ' · '+liveNote : '')+'. Se actualiza solo; clic para revisar ahora.');
 }
 setInterval(()=>{ if (lastCheck && document.getElementById('statusDot').classList.contains('ok')) showLive(); }, 30000);
 
 async function loadMuseums(initial, manual){
   if (cargando) return;
   cargando = true;
-  if (initial) setStatus('loading', 'Cargando museos de Bolivia…');
+  if (initial) setStatus('loading', 'Cargando…', 'Cargando museos de Bolivia…');
   else document.getElementById('statusDot').className = 'dot loading';
   try{
     const data = await fetchMuseos();
@@ -1464,6 +1671,7 @@ async function loadMuseums(initial, manual){
       renderAll();
       document.getElementById('loadingOverlay').classList.add('hidden');
       applyHash();
+      cargarArticulos();
     } else {
       const {added, edited, removed} = applyData(list);
       if (added+edited+removed===0){
@@ -1489,13 +1697,14 @@ async function loadMuseums(initial, manual){
             added===1 ? '+1 museo nuevo — ver en el mapa' : `+${added} museos nuevos — ver en el mapa`;
           document.getElementById('newBadge').classList.add('show');
         }
-        liveNote = '✨ Cambios en OSM: '+resumen;
+        liveNote = 'últimos cambios: '+resumen;
         showToast('✨ Museos actualizados desde OSM: '+resumen,'success');
+        cargarArticulos();
       }
     }
     showLive();
   }catch(e){
-    setStatus('error', 'No se pudieron leer los museos ('+e.message+') — se reintentará en unos minutos');
+    setStatus('error', 'Sin conexión', 'No se pudieron leer los museos ('+e.message+'); se reintentará en unos minutos.');
     if (initial) document.getElementById('loadingOverlay').classList.add('hidden');
     showToast('No se pudieron cargar los museos','error');
   }
@@ -1513,7 +1722,7 @@ document.getElementById('newBadge').addEventListener('click', ()=>{
   }
 });
 
-document.getElementById('btnRefreshNow').addEventListener('click', ()=>loadMuseums(false, true));
+document.getElementById('livePill').addEventListener('click', ()=>loadMuseums(false, true));
 
 function scheduleNext(){
   clearTimeout(refreshTimer);
@@ -1524,10 +1733,10 @@ document.addEventListener('visibilitychange', ()=>{
   if (!document.hidden && lastCheck && Date.now()-lastCheck > CFG.refreshInterval) loadMuseums(false);
 });
 
-function setStatus(type, text){
+function setStatus(type, text, detalle){
   document.getElementById('statusDot').className = 'dot '+type;
   document.getElementById('statusText').textContent = text;
-  document.getElementById('statusText').title = text;
+  document.getElementById('livePill').title = detalle || text;
 }
 let toastTimer;
 function showToast(msg, type=''){
@@ -1562,6 +1771,7 @@ document.addEventListener('keydown', e=>{
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase()==='k'){ e.preventDefault(); focusSearch(); return; }
   if (e.key==='Escape'){
     if (cerrarAyuda()) return;
+    if (!document.getElementById('hlPanel').hidden){ toggleResaltarPanel(false); return; }
     if (enCampo){ e.target.blur(); return; }
     if (closeSheet()) return;
     if (openId){ map.closePopup(); return; }
@@ -1584,6 +1794,8 @@ document.addEventListener('keydown', e=>{
   else if (k==='u'){ switchView('mapView'); locate(); }
   else if (k==='r') loadMuseums(false, true);
   else if (k==='f') toggleFullscreen();
+  else if (k==='h'){ switchView('mapView'); toggleResaltarPanel(); }
+  else if (k==='w'){ switchView('mapView'); toggleResalte('wp'); }
 });
 
 /* ============================================================
