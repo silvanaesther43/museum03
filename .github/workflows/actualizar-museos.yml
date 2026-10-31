@@ -2,7 +2,9 @@ name: Actualizar museos desde OSM
 
 on:
   schedule:
-    - cron: '17 */6 * * *'   # cada 6 horas (UTC)
+    # Cada 15 minutos, lejos del minuto 00 (la hora en punto es cuando GitHub más retrasa
+    # o descarta ejecuciones programadas).
+    - cron: '4,19,34,49 * * * *'
   workflow_dispatch:          # botón "Run workflow" en la pestaña Actions
 
 permissions:
@@ -15,13 +17,13 @@ concurrency:
 jobs:
   actualizar:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 14   # menos que el intervalo, para no encimarse con la siguiente
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
-          node-version: 20
+          node-version: 24
 
       - name: Consultar Overpass y regenerar data/museos.geojson
         run: node scripts/actualizar_museos.mjs
@@ -36,4 +38,6 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add data/museos.geojson
           git commit -m "Actualizar museos desde OpenStreetMap"
+          # Si alguien subió algo a main mientras corría, se pone encima en vez de fallar.
+          git pull --rebase origin main
           git push

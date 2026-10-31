@@ -357,7 +357,7 @@ table.simple tr:hover td{color:var(--text)}
    CONFIGURACIÓN
    ============================================================ */
 const CFG = {
-  // Lo regenera cada 6 h GitHub Actions (scripts/actualizar_museos.mjs) consultando
+  // Lo regenera cada 15 min GitHub Actions (scripts/actualizar_museos.mjs) consultando
   // Overpass; la página solo lee este archivo y lo vuelve a pedir cada refreshInterval.
   dataUrl: 'data/museos.geojson',
   refreshInterval: 5 * 60 * 1000,
@@ -402,7 +402,8 @@ function museumCategory(tags){
    ESTADO GLOBAL
    ============================================================ */
 let MUSEUMS = [];          // todos los museos cargados {i,a,o,d,n,cat,...}
-let loadedIds = new Set();
+let newIds = new Set();    // museos que aparecieron con la página abierta (borde verde)
+let openPopupId = null;    // museo con la ficha abierta, para reabrirla tras una actualización
 let activeCats = new Set();
 let currentDept = 'all';
 let searchText = '';
@@ -454,14 +455,17 @@ const mascara = L.polygon([
 ], {pane:'mascara', stroke:false, fillColor:'#100c08', fillOpacity:.45, interactive:false});
 
 const DEPT_ATTRIB = 'Límites: <a href="https://www.geoboundaries.org" target="_blank">geoBoundaries</a> / GeoBolivia';
+// Violeta y punteado, como se dibujan los límites en cartografía: así no se confunden con
+// las vías principales, que en los mapas base van en amarillo, naranja y rojo.
+const LIMITE = '#b46ae6', LIMITE_PAIS = '#9447cc', LIMITE_DASH = '7 5';
 const deptFill = L.geoJSON(BOLIVIA_DEPARTAMENTOS, {interactive:false, style:()=>({stroke:false, fillOpacity:0})});
 const deptCasing = L.geoJSON(BOLIVIA_DEPARTAMENTOS, {interactive:false,
-  style:{color:'#1a1208', weight:3.5, opacity:.35, fill:false}});
+  style:{color:LIMITE, weight:6, opacity:.15, fill:false}});
 const deptLine = L.geoJSON(BOLIVIA_DEPARTAMENTOS, {interactive:false, attribution:DEPT_ATTRIB,
-  style:{color:'#e8b862', weight:1.3, opacity:.9, fill:false}});
+  style:{color:LIMITE, weight:1.8, opacity:.95, dashArray:LIMITE_DASH, fill:false}});
 const paisLine = L.layerGroup([
-  L.geoJSON(BOLIVIA_CONTORNO, {interactive:false, style:{color:'#1a1208', weight:5, opacity:.5, fill:false}}),
-  L.geoJSON(BOLIVIA_CONTORNO, {interactive:false, style:{color:'#cf9a44', weight:2.4, opacity:1, fill:false}}),
+  L.geoJSON(BOLIVIA_CONTORNO, {interactive:false, style:{color:LIMITE_PAIS, weight:10, opacity:.18, fill:false}}),
+  L.geoJSON(BOLIVIA_CONTORNO, {interactive:false, style:{color:LIMITE_PAIS, weight:2.6, opacity:1, fill:false}}),
 ]);
 
 const deptBounds = {}, deptLabels = {};
@@ -481,14 +485,15 @@ mascara.addTo(map);
 function styleDepts(){
   deptFill.setStyle(f=>{
     const d = f.properties.nombre;
-    if (currentDept==='all') return {stroke:false, fillColor:'#cf9a44', fillOpacity:.04};
+    if (currentDept==='all') return {stroke:false, fillColor:LIMITE, fillOpacity:.04};
     return d===currentDept
-      ? {stroke:false, fillColor:'#cf9a44', fillOpacity:.1}
+      ? {stroke:false, fillColor:LIMITE, fillOpacity:.08}
       : {stroke:false, fillColor:'#100c08', fillOpacity:.3};
   });
+  // El departamento elegido va con línea continua y más gruesa.
   deptLine.setStyle(f=>f.properties.nombre===currentDept
-    ? {color:'#e8b862', weight:3, opacity:1}
-    : {color:'#e8b862', weight:1.3, opacity:.9});
+    ? {color:LIMITE, weight:3, opacity:1, dashArray:null}
+    : {color:LIMITE, weight:1.8, opacity:.95, dashArray:LIMITE_DASH});
   deptLine.eachLayer(l=>{ if (l.feature.properties.nombre===currentDept) l.bringToFront(); });
   for (const [d, mk] of Object.entries(deptLabels)){
     const el = mk.getElement()?.querySelector('.dept-label');
@@ -606,15 +611,20 @@ function passesFilter(m){
   return true;
 }
 
+const markerById = new Map();
 function renderAll(){
   cluster.clearLayers();
+  markerById.clear();
   let count=0;
   for (const m of MUSEUMS){
     if (!passesFilter(m)) continue;
-    const marker = L.marker([m.a,m.o],{icon:museumIcon(m.cat,false)});
-    marker.bindPopup(()=>buildPopup(m), {maxWidth:300, minWidth:290});
-    marker.on('popupopen', ()=>enrichPopup(m));
+    const isNew = newIds.has(m.i);
+    const marker = L.marker([m.a,m.o],{icon:museumIcon(m.cat,isNew)});
+    marker.bindPopup(()=>buildPopup(m,isNew), {maxWidth:300, minWidth:290});
+    marker.on('popupopen', ()=>{ openPopupId = m.i; enrichPopup(m); });
+    marker.on('popupclose', ()=>{ if (openPopupId===m.i) openPopupId = null; });
     cluster.addLayer(marker);
+    markerById.set(m.i, marker);
     count++;
   }
   document.getElementById('countBadge').textContent = count.toLocaleString()+' museos';
@@ -622,14 +632,22 @@ function renderAll(){
   updateDashboard();
 }
 
-function addNewMarkers(list){
+// Deja MUSEUMS igual al GeoJSON recién leído: agrega, actualiza y quita museos.
+function applyData(list){
+  const prev = new Map(MUSEUMS.map(m=>[m.i, m]));
+  const listed = new Set([...document.querySelectorAll('#catList input')].map(cb=>cb.dataset.cat));
+  let added=0, edited=0;
   for (const m of list){
-    if (!passesFilter(m)) continue;
-    const marker = L.marker([m.a,m.o],{icon:museumIcon(m.cat,true)});
-    marker.bindPopup(()=>buildPopup(m,true), {maxWidth:300, minWidth:290});
-    marker.on('popupopen', ()=>enrichPopup(m));
-    cluster.addLayer(marker);
+    const old = prev.get(m.i);
+    if (!old){ added++; newIds.add(m.i); }
+    else if (JSON.stringify(old)!==JSON.stringify(m)) edited++;
+    prev.delete(m.i);
   }
+  for (const id of prev.keys()) newIds.delete(id);
+  // Un tipo que no estaba en la lista aparece marcado; los que el usuario desmarcó, siguen así.
+  if (activeCats.size) for (const m of list) if (!listed.has(m.cat)) activeCats.add(m.cat);
+  MUSEUMS = list;
+  return {added, edited, removed:prev.size};
 }
 
 /* ============================================================
@@ -672,7 +690,6 @@ function buildPopup(m, isNew){
       ${rows}${masInfo}
       <div class="pop-btns">${social}
         <a class="pop-btn" href="${osmUrl}" target="_blank">Ver en OSM ↗</a>
-        <a class="pop-btn" href="${osmUrl.replace('www.openstreetmap.org','www.openstreetmap.org/edit?')}" target="_blank">Editar en OSM</a>
         <button class="pop-btn primary" onclick="window.__routeTo('${m.i}')">📍 Cómo llegar</button>
       </div>
       <div class="pop-wiki" id="wiki-${cssId(m.i)}">
@@ -1033,31 +1050,40 @@ async function loadMuseums(initial){
     const data = await fetchMuseos();
     const fecha = new Date(data.actualizado).toLocaleString('es-BO',
       {timeZone:'America/La_Paz', dateStyle:'short', timeStyle:'short'});
-    const nuevos = [];
-    for (const f of data.features){
-      const m = featureToMuseum(f);
-      if (loadedIds.has(m.i)) continue;
-      loadedIds.add(m.i);
-      MUSEUMS.push(m);
-      nuevos.push(m);
-    }
-    rebuildCategoryList();
-    rebuildMuseumDatalist();
+    const hora = new Date().toLocaleTimeString('es-BO', {timeZone:'America/La_Paz', timeStyle:'short'});
+    const list = data.features.map(featureToMuseum);
     if (initial){
+      MUSEUMS = list;
+      rebuildCategoryList();
+      rebuildMuseumDatalist();
       renderAll();
       document.getElementById('loadingOverlay').classList.add('hidden');
       setStatus('ok', '✓ '+MUSEUMS.length.toLocaleString()+' museos de OpenStreetMap · datos del '+fecha);
       showToast('✓ '+MUSEUMS.length.toLocaleString()+' museos cargados','success');
-    } else if (nuevos.length>0){
-      addNewMarkers(nuevos);
-      document.getElementById('newCount').textContent = nuevos.length;
-      document.getElementById('newBadge').classList.add('show');
-      setStatus('ok','✓ '+nuevos.length+' museo(s) nuevo(s) detectado(s) en OSM');
-      showToast('✨ '+nuevos.length+' museo(s) nuevo(s) en OSM','success');
-      updateDashboard();
-      if (userLatLng) renderNearby();
     } else {
-      setStatus('ok', '✓ Sin cambios — '+MUSEUMS.length.toLocaleString()+' museos · datos del '+fecha);
+      const {added, edited, removed} = applyData(list);
+      if (added+edited+removed===0){
+        setStatus('ok', '✓ Sin cambios — '+MUSEUMS.length.toLocaleString()+' museos · datos del '+fecha+' · revisado '+hora);
+      } else {
+        const reabrir = openPopupId;   // renderAll cierra la ficha abierta
+        rebuildCategoryList();
+        rebuildMuseumDatalist();
+        renderAll();
+        const mk = markerById.get(reabrir);
+        if (mk && cluster.getVisibleParent(mk)===mk) mk.openPopup();
+        if (userLatLng) renderNearby();
+        const resumen = [
+          added ? added+(added===1?' nuevo':' nuevos') : '',
+          edited ? edited+(edited===1?' editado':' editados') : '',
+          removed ? removed+(removed===1?' eliminado':' eliminados') : '',
+        ].filter(Boolean).join(' · ');
+        if (added){
+          document.getElementById('newCount').textContent = added;
+          document.getElementById('newBadge').classList.add('show');
+        }
+        setStatus('ok', '✓ Cambios en OSM: '+resumen+' — '+MUSEUMS.length.toLocaleString()+' museos · datos del '+fecha);
+        showToast('✨ Museos actualizados desde OSM: '+resumen,'success');
+      }
     }
   }catch(e){
     setStatus('error', 'Error cargando los museos: '+e.message);

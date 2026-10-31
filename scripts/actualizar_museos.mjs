@@ -12,8 +12,9 @@ import { fileURLToPath } from 'node:url';
 const RAIZ = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SALIDA = path.join(RAIZ, 'data', 'museos.geojson');
 // overpass-api.de suele responder 502 por ratos cuando está saturado: más intentos.
+// Peor caso ≈ 10 min, menos que los 15 min entre ejecuciones (timeout-minutes: 14).
 const SERVIDORES = [
-  {url:'https://overpass-api.de/api/interpreter', intentos:4},
+  {url:'https://overpass-api.de/api/interpreter', intentos:3},
   {url:'https://maps.mail.ru/osm/tools/overpass/api/interpreter', intentos:2},
 ];
 // Solo museos dentro del límite nacional de Bolivia en OSM.
@@ -28,7 +29,7 @@ async function consultarOverpass(){
     for (let intento = 1; intento <= intentos; intento++){
       try{
         const r = await fetch(url, {
-          method:'POST', body, signal: AbortSignal.timeout(150_000),
+          method:'POST', body, signal: AbortSignal.timeout(100_000),
           headers:{
             'Content-Type':'application/x-www-form-urlencoded', 'Accept':'application/json',
             'User-Agent':'museum03-geoportal (github.com/silvanaesther43/museum03)',
@@ -41,7 +42,7 @@ async function consultarOverpass(){
         return j;
       }catch(e){
         console.warn(`${url} (intento ${intento}): ${e.message}`);
-        if (intento < intentos) await new Promise(res=>setTimeout(res, 30_000*intento));
+        if (intento < intentos) await new Promise(res=>setTimeout(res, 20_000*intento));
       }
     }
   }
