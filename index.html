@@ -1629,8 +1629,16 @@ function calcularRutaDesdeInput(){
 document.getElementById('btnRoute').addEventListener('click', calcularRutaDesdeInput);
 document.getElementById('routeInput').addEventListener('keydown', e=>{ if (e.key==='Enter') calcularRutaDesdeInput(); });
 
-function quitarRuta(){
+// La ruta en azul con borde blanco: la dorada se perdía sobre las calles amarillas y
+// naranjas del mapa base. Si no hay ruta por calle, una línea recta punteada.
+const RUTA_ESTILO = [{color:'#ffffff', opacity:.95, weight:9}, {color:'#1a73e8', opacity:1, weight:5}];
+let rutaRecta = null;
+function borrarRutaDibujada(){
   if (routingControl){ map.removeControl(routingControl); routingControl = null; }
+  if (rutaRecta){ map.removeLayer(rutaRecta); rutaRecta = null; }
+}
+function quitarRuta(){
+  borrarRutaDibujada();
   document.getElementById('routeResult').classList.remove('show');
 }
 window.__quitarRuta = quitarRuta;
@@ -1648,12 +1656,17 @@ function routeTo(m){
     <div id="routeStatus" style="margin-top:4px;color:var(--text-faint)">Calculando ruta por calle…</div>
     <button class="link-btn" onclick="window.__quitarRuta()">✕ Quitar ruta</button>`;
 
-  if (routingControl){ map.removeControl(routingControl); routingControl=null; }
+  borrarRutaDibujada();
+  // Mientras llega la ruta, el mapa ya muestra el tramo entre la persona y el museo.
+  map.fitBounds(L.latLngBounds([userLatLng, [m.a, m.o]]), {padding:[60,60], maxZoom:16, animate:!reduceMotion});
 
   let settled = false, ctl = null;
   const sinRuta = ()=>{
     const st = document.getElementById('routeStatus');
-    if (st) st.textContent = 'Ruta por calle no disponible; se muestra la distancia en línea recta.';
+    if (st) st.textContent = 'Ruta por calle no disponible; se marca la línea recta.';
+    if (ctl){ map.removeControl(ctl); if (routingControl===ctl) routingControl = null; }
+    rutaRecta = L.polyline([userLatLng, [m.a, m.o]], {color:'#1a73e8', weight:4, opacity:.9, dashArray:'8 8', interactive:false}).addTo(map);
+    map.fitBounds(rutaRecta.getBounds(), {padding:[60,60], maxZoom:16, animate:!reduceMotion});
     showToast(`📏 ${km.toFixed(1)} km en línea recta hasta ${m.n}`);
   };
   const fallbackTimer = setTimeout(()=>{
@@ -1666,9 +1679,11 @@ function routeTo(m){
     ctl = routingControl = L.Routing.control({
       waypoints:[L.latLng(userLatLng[0],userLatLng[1]), L.latLng(m.a,m.o)],
       routeWhileDragging:false, addWaypoints:false, draggableWaypoints:false,
-      show:false, fitSelectedRoutes:true,
+      // El encuadre lo hace routesfound, con margen: sin él la partida quedaba pegada al borde.
+      show:false, fitSelectedRoutes:false,
+      defaultErrorHandler:false,   // el error ya se atiende abajo (línea recta y aviso)
       createMarker: ()=>null,
-      lineOptions:{styles:[{color:'#e8b862', weight:4, opacity:.85}]},
+      lineOptions:{styles:RUTA_ESTILO, addWaypoints:false},
     }).addTo(map);
 
     // Si mientras tanto se pidió otra ruta, la respuesta vieja no pisa la nueva.
@@ -1676,6 +1691,8 @@ function routeTo(m){
       if (settled || ctl!==routingControl) return;
       settled = true; clearTimeout(fallbackTimer);
       const r = e.routes[0];
+      map.fitBounds(L.latLngBounds(r.coordinates).extend(userLatLng).extend([m.a, m.o]),
+        {padding:[60,60], animate:!reduceMotion});
       const kmRuta = r.summary.totalDistance/1000;
       const enAuto = Math.max(1, Math.round(r.summary.totalTime/60));
       const aPie = Math.round(kmRuta/4.5*60);   // 4,5 km/h
