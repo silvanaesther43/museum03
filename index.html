@@ -143,6 +143,7 @@ details.side-block > summary h3{margin-bottom:0}
 details.side-block > summary h3::after{content:'▾'; margin-left:auto; color:var(--text-faint); transition:transform .15s}
 details.side-block:not([open]) > summary h3::after{transform:rotate(-90deg)}
 details.side-block[open] > summary h3{margin-bottom:9px}
+details.sub-block{margin-top:14px}
 .cat-list{display:flex; flex-direction:column; gap:1px; max-height:280px; overflow-y:auto; overflow-x:hidden; margin-top:4px}
 .cat-list::-webkit-scrollbar{width:5px}
 .cat-list::-webkit-scrollbar-thumb{background:var(--line); border-radius:3px}
@@ -432,10 +433,11 @@ table.simple tfoot td{font-weight:600; color:var(--text); border-top:1px solid v
       <datalist id="museumDatalist"></datalist>
       <button class="btn btn-outline btn-sm" id="btnRoute" style="width:100%;margin-top:6px">Calcular ruta</button>
       <div class="route-result" id="routeResult"></div>
-      <div id="nearbyWrap" hidden>
-        <h3 style="margin-top:14px">Museos cercanos <span class="muted">· toca uno para ver la ruta</span></h3>
+      <!-- Plegado al abrir la página, igual que «Museos»; se despliega con un clic. -->
+      <details class="side-block sub-block" id="nearbyWrap" hidden>
+        <summary><h3>Museos cercanos <span class="muted">· toca uno para ver la ruta</span></h3></summary>
         <div class="res-list" id="nearbyList"></div>
-      </div>
+      </details>
     </div>
 
     <!-- Desplegado al abrir la página: los tipos y sus colores se ven de entrada. -->
@@ -448,10 +450,10 @@ table.simple tfoot td{font-weight:600; color:var(--text); border-top:1px solid v
       <div class="cat-list" id="catList"></div>
     </details>
 
-    <div class="side-block">
-      <h3>Museos <span class="muted" id="resCount"></span></h3>
+    <details class="side-block" id="resBlock">
+      <summary><h3>Museos <span class="muted" id="resCount"></span></h3></summary>
       <div class="res-list" id="resList"></div>
-    </div>
+    </details>
 
   </aside>
 
@@ -1422,6 +1424,8 @@ function applySearch(){
   const q = fold(searchInput.value.trim());
   if (q===searchText) return;
   searchText = q;
+  // «Museos» empieza plegado: al buscar se abre para que se vean los resultados.
+  if (q) document.getElementById('resBlock').open = true;
   renderAll();
 }
 searchInput.addEventListener('input', ()=>{ clearTimeout(searchTimer); searchTimer = setTimeout(applySearch, 120); });
@@ -1431,6 +1435,7 @@ searchInput.addEventListener('keydown', e=>{
     applySearch();
     const n = Math.min(resItems.length, resLimit);
     if (!n) return;
+    document.getElementById('resBlock').open = true;   // moverse por la lista requiere verla
     resActive = e.key==='ArrowDown' ? (resActive+1) % n : (resActive<=0 ? n-1 : resActive-1);
     highlightRes();
   } else if (e.key==='Enter'){
